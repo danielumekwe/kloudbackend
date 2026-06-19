@@ -3,24 +3,24 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Services\WhmcsService;
+use App\Services\TicketService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SupportController extends Controller
 {
-    public function __construct(private WhmcsService $whmcs) {}
+    public function __construct(private TicketService $tickets) {}
 
     public function index(): View
     {
-        $tickets = $this->whmcs->getTickets(session('clientId'));
+        $tickets = $this->tickets->getTickets(session('clientId'));
         return view('dashboard.support.index', compact('tickets'));
     }
 
     public function create(): View
     {
-        $departments = $this->whmcs->getSupportDepartments();
+        $departments = $this->tickets->getSupportDepartments();
         return view('dashboard.support.create', compact('departments'));
     }
 
@@ -33,7 +33,7 @@ class SupportController extends Controller
             'priority' => ['required', 'in:Low,Medium,High'],
         ]);
 
-        $result = $this->whmcs->openTicket([
+        $result = $this->tickets->openTicket([
             'clientid' => session('clientId'),
             'deptid'   => $request->deptid,
             'subject'  => $request->subject,
@@ -55,7 +55,7 @@ class SupportController extends Controller
     {
         $this->ensureOwnsTicket($id);
 
-        $ticket = $this->whmcs->getTicket($id);
+        $ticket = $this->tickets->getTicket($id);
 
         if (($ticket['result'] ?? '') !== 'success') {
             abort(404, 'Ticket not found.');
@@ -72,7 +72,7 @@ class SupportController extends Controller
             'message' => ['required', 'string', 'min:5'],
         ]);
 
-        $result = $this->whmcs->replyTicket($id, session('clientId'), $request->message);
+        $result = $this->tickets->replyTicket($id, session('clientId'), $request->message);
 
         if (($result['result'] ?? '') !== 'success') {
             return back()
@@ -88,7 +88,7 @@ class SupportController extends Controller
     {
         $this->ensureOwnsTicket($id);
 
-        $result = $this->whmcs->closeTicket($id);
+        $result = $this->tickets->closeTicket($id);
 
         if (($result['result'] ?? '') !== 'success') {
             return back()->with('error', $result['message'] ?? 'Failed to close ticket.');
@@ -98,19 +98,9 @@ class SupportController extends Controller
             ->with('success', 'Ticket closed successfully.');
     }
 
-    /**
-     * GetTicket (single) takes no clientid filter, so without this check any logged-in
-     * client could read/reply-to/close any other client's ticket by guessing its id.
-     * GetTickets(clientid) is the one WHMCS endpoint that's actually scoped, so it
-     * doubles as the ownership check here.
-     */
     private function ensureOwnsTicket(int $id): void
     {
-        $tickets = $this->whmcs->getTickets(session('clientId'));
-
-        $owns = collect($tickets)->contains(fn (array $ticket) => (int) ($ticket['id'] ?? 0) === $id);
-
-        if (! $owns) {
+        if (! $this->tickets->ownsTicket($id, session('clientId'))) {
             abort(404, 'Ticket not found.');
         }
     }

@@ -8,6 +8,7 @@ use App\Models\PaymentTransaction;
 use App\Models\QsOrder;
 use App\Models\SslOrder;
 use App\Models\VpsOrder;
+use App\Services\TicketService;
 use App\Services\WhmcsService;
 use App\Support\CurrencyConverter;
 use Illuminate\Support\Facades\Cache;
@@ -15,7 +16,7 @@ use Illuminate\View\View;
 
 class AdminDashboardController extends Controller
 {
-    public function __construct(private WhmcsService $whmcs) {}
+    public function __construct(private WhmcsService $whmcs, private TicketService $tickets) {}
 
     public function index(): View
     {
@@ -31,7 +32,8 @@ class AdminDashboardController extends Controller
         ];
 
         // WHMCS round-trips are the expensive part of this page — cached briefly so
-        // refreshing the dashboard doesn't hammer the WHMCS API on every load.
+        // refreshing the dashboard doesn't hammer the WHMCS API on every load. Tickets
+        // are local now (Phase 1 of the WHMCS exit) so they're read fresh, uncached.
         $whmcsStats = Cache::remember('admin.dashboard.whmcs_stats', now()->addMinutes(2), function () {
             $outstanding = $this->whmcs->getOutstandingInvoices();
 
@@ -39,7 +41,6 @@ class AdminDashboardController extends Controller
                 'pending_invoices'  => $this->whmcs->getInvoiceCountByStatus('Unpaid'),
                 'overdue_invoices'  => $this->whmcs->getInvoiceCountByStatus('Overdue'),
                 'paid_invoices'     => $this->whmcs->getInvoiceCountByStatus('Paid'),
-                'open_tickets'      => $this->whmcs->getOpenTicketCount(),
                 'revenue_waiting'   => round(array_sum(array_map(
                     fn (array $invoice) => CurrencyConverter::convertToUsd(
                         (float) ($invoice['balance'] ?? $invoice['total'] ?? 0),
@@ -49,6 +50,8 @@ class AdminDashboardController extends Controller
                 )), 2),
             ];
         });
+
+        $whmcsStats['open_tickets'] = $this->tickets->getOpenTicketCount();
 
         return view('admin.dashboard', [
             'stats'        => $stats,

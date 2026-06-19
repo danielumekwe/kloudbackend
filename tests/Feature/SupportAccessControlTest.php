@@ -2,75 +2,59 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Http\Client\Request as ClientRequest;
-use Illuminate\Support\Facades\Http;
+use App\Models\SupportDepartment;
+use App\Models\SupportTicket;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SupportAccessControlTest extends TestCase
 {
-    private function fakeWhmcs(array $ownedTicketIds): void
-    {
-        Http::fake(function (ClientRequest $request) use ($ownedTicketIds) {
-            $action = $request->data()['action'] ?? null;
+    use RefreshDatabase;
 
-            return match ($action) {
-                'GetTickets' => Http::response([
-                    'result' => 'success',
-                    'tickets' => ['ticket' => array_map(fn ($id) => ['id' => $id, 'tid' => $id], $ownedTicketIds)],
-                ]),
-                'GetTicket' => Http::response([
-                    'result' => 'success',
-                    'tid' => 55,
-                    'ticketid' => 'TICK-55',
-                    'subject' => 'Test',
-                    'message' => 'Test message',
-                    'status' => 'Open',
-                    'priority' => 'Low',
-                    'date' => '2026-06-01',
-                    'department' => 'Support',
-                    'deptname' => 'Support',
-                    'replies' => ['reply' => []],
-                ]),
-                'AddTicketReply' => Http::response(['result' => 'success']),
-                'CloseTicket' => Http::response(['result' => 'success']),
-                'GetCurrencies' => Http::response(['result' => 'error']),
-                default => Http::response(['result' => 'error'], 404),
-            };
-        });
+    private function makeTicket(int $clientId): SupportTicket
+    {
+        $department = SupportDepartment::create(['name' => 'Billing']);
+
+        return SupportTicket::create([
+            'client_id' => $clientId,
+            'department_id' => $department->id,
+            'subject' => 'Test ticket',
+            'message' => 'Test message',
+        ]);
     }
 
     public function test_client_cannot_view_another_clients_ticket(): void
     {
-        $this->fakeWhmcs(ownedTicketIds: [10, 20]);
+        $ticket = $this->makeTicket(clientId: 10);
 
-        $response = $this->withSession(['clientId' => 7])->get('/support/55');
+        $response = $this->withSession(['clientId' => 7])->get("/support/{$ticket->id}");
 
         $response->assertStatus(404);
     }
 
     public function test_client_can_view_their_own_ticket(): void
     {
-        $this->fakeWhmcs(ownedTicketIds: [55]);
+        $ticket = $this->makeTicket(clientId: 7);
 
-        $response = $this->withSession(['clientId' => 7])->get('/support/55');
+        $response = $this->withSession(['clientId' => 7])->get("/support/{$ticket->id}");
 
         $response->assertOk();
     }
 
     public function test_client_cannot_reply_to_another_clients_ticket(): void
     {
-        $this->fakeWhmcs(ownedTicketIds: [10, 20]);
+        $ticket = $this->makeTicket(clientId: 10);
 
-        $response = $this->withSession(['clientId' => 7])->post('/support/55/reply', ['message' => 'Hello there']);
+        $response = $this->withSession(['clientId' => 7])->post("/support/{$ticket->id}/reply", ['message' => 'Hello there']);
 
         $response->assertStatus(404);
     }
 
     public function test_client_cannot_close_another_clients_ticket(): void
     {
-        $this->fakeWhmcs(ownedTicketIds: [10, 20]);
+        $ticket = $this->makeTicket(clientId: 10);
 
-        $response = $this->withSession(['clientId' => 7])->post('/support/55/close');
+        $response = $this->withSession(['clientId' => 7])->post("/support/{$ticket->id}/close");
 
         $response->assertStatus(404);
     }

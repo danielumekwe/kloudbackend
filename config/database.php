@@ -114,6 +114,21 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        // Read-only connection to the real WHMCS MySQL database, used only by the
+        // one-time `whmcs:migrate-*` commands during the phased WHMCS exit (see
+        // /Users/Apple/.claude/plans/hidden-baking-gem.md). Use a read-only DB user.
+        'whmcs' => [
+            'driver' => 'mysql',
+            'host' => env('WHMCS_DB_HOST', '127.0.0.1'),
+            'port' => env('WHMCS_DB_PORT', '3306'),
+            'database' => env('WHMCS_DB_DATABASE', ''),
+            'username' => env('WHMCS_DB_USERNAME', ''),
+            'password' => env('WHMCS_DB_PASSWORD', ''),
+            'charset' => env('WHMCS_DB_CHARSET', 'utf8mb4'),
+            'collation' => env('WHMCS_DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+        ],
+
     ],
 
     /*

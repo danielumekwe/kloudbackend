@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\DomainOrder;
 use App\Models\PaymentTransaction;
+use App\Models\SupportDepartment;
+use App\Models\SupportTicket;
 use App\Models\VpsOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
@@ -32,10 +34,6 @@ class AdminDashboardTest extends TestCase
                     'Paid' => Http::response(['result' => 'success', 'totalresults' => 12, 'invoices' => ['invoice' => []]]),
                     default => Http::response(['result' => 'success', 'totalresults' => 0, 'invoices' => ['invoice' => []]]),
                 };
-            }
-
-            if ($action === 'GetTickets') {
-                return Http::response(['result' => 'success', 'totalresults' => 4, 'tickets' => ['ticket' => []]]);
             }
 
             if ($action === 'GetCurrencies') {
@@ -70,6 +68,11 @@ class AdminDashboardTest extends TestCase
             'gateway_reference' => 'ref-1', 'amount' => 100, 'currency' => 'USD', 'status' => 'completed',
         ]);
 
+        $department = SupportDepartment::create(['name' => 'Billing']);
+        SupportTicket::create(['client_id' => 1, 'department_id' => $department->id, 'subject' => 'a', 'message' => 'b', 'status' => 'Open']);
+        SupportTicket::create(['client_id' => 1, 'department_id' => $department->id, 'subject' => 'c', 'message' => 'd', 'status' => 'Open']);
+        SupportTicket::create(['client_id' => 1, 'department_id' => $department->id, 'subject' => 'e', 'message' => 'f', 'status' => 'Closed']);
+
         $response = $this->withSession(['isAdmin' => true])->get('/admin/dashboard');
 
         $response->assertOk();
@@ -79,7 +82,7 @@ class AdminDashboardTest extends TestCase
             return $stats['pending_invoices'] === 3
                 && $stats['overdue_invoices'] === 1
                 && $stats['paid_invoices'] === 12
-                && $stats['open_tickets'] === 4
+                && $stats['open_tickets'] === 2
                 && $stats['revenue_waiting'] === 15.0;
         });
     }
