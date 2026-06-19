@@ -38,21 +38,21 @@ Route::post('/webhooks/nowpayments', [WebhookController::class, 'nowpayments'])-
 // -------------------------------------------------------------------------
 Route::middleware('guest')->group(function () {
     Route::get('/login',     [LoginController::class,    'show'])->name('login');
-    Route::post('/login',    [LoginController::class,    'login']);
+    Route::post('/login',    [LoginController::class,    'login'])->middleware('throttle:6,1');
     Route::get('/register',  [RegisterController::class, 'show'])->name('register');
-    Route::post('/register', [RegisterController::class, 'register']);
+    Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:6,1');
 
     // Forgot / reset password
     Route::get('/password/forgot',      [PasswordResetController::class, 'showForgot'])->name('password.request');
-    Route::post('/password/forgot',     [PasswordResetController::class, 'sendResetLink'])->name('password.email');
+    Route::post('/password/forgot',     [PasswordResetController::class, 'sendResetLink'])->name('password.email')->middleware('throttle:6,1');
     Route::get('/password/reset/{token}', [PasswordResetController::class, 'showReset'])->name('password.reset');
-    Route::post('/password/reset',      [PasswordResetController::class, 'resetPassword'])->name('password.update');
+    Route::post('/password/reset',      [PasswordResetController::class, 'resetPassword'])->name('password.update')->middleware('throttle:6,1');
 
     // Social login (Google / Facebook)
     Route::get('/auth/{provider}/redirect', [SocialLoginController::class, 'redirect'])->name('social.redirect');
     Route::get('/auth/{provider}/callback', [SocialLoginController::class, 'callback'])->name('social.callback');
     Route::get('/auth/social/complete',     [SocialLoginController::class, 'showComplete'])->name('social.complete');
-    Route::post('/auth/social/complete',    [SocialLoginController::class, 'storeComplete'])->name('social.complete.store');
+    Route::post('/auth/social/complete',    [SocialLoginController::class, 'storeComplete'])->name('social.complete.store')->middleware('throttle:6,1');
 });
 
 Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
@@ -163,8 +163,16 @@ Route::middleware('whmcs.auth')->group(function () {
 // -------------------------------------------------------------------------
 Route::prefix('admin')->group(function () {
     Route::get('/login',  [AdminAuthController::class, 'showLogin'])->name('admin.login');
-    Route::post('/login', [AdminAuthController::class, 'login']);
+    Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:6,1');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+
+    // Admin password reset — separate from the client-facing one in PasswordResetController.
+    // Only reachable if the email matches a real admins row; otherwise changing the admin
+    // password requires direct DB access (see App\Models\Admin::checkPassword).
+    Route::get('/forgot-password',  [AdminAuthController::class, 'showForgot'])->name('admin.password.request');
+    Route::post('/forgot-password', [AdminAuthController::class, 'sendResetLink'])->name('admin.password.email')->middleware('throttle:6,1');
+    Route::get('/reset-password/{token}', [AdminAuthController::class, 'showReset'])->name('admin.password.reset');
+    Route::post('/reset-password', [AdminAuthController::class, 'resetPassword'])->name('admin.password.update')->middleware('throttle:6,1');
 
     Route::middleware('admin.auth')->group(function () {
         Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');

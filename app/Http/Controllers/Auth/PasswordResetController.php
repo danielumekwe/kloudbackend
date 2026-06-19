@@ -72,7 +72,7 @@ class PasswordResetController extends Controller
 
         if (! $record
             || ! Hash::check($request->token, $record->token)
-            || now()->diffInMinutes($record->created_at) > self::TOKEN_TTL_MINUTES
+            || abs(now()->diffInMinutes($record->created_at)) > self::TOKEN_TTL_MINUTES
         ) {
             return back()->withErrors(['email' => 'This password reset link is invalid or has expired.']);
         }

@@ -62,10 +62,6 @@ return [
         'api_key' => env('INTERSERVER_API_KEY', ''),
     ],
 
-    'admin' => [
-        'password' => env('ADMIN_PASSWORD', ''),
-    ],
-
     'paystack' => [
         'public_key' => env('PAYSTACK_PUBLIC_KEY', ''),
         'secret_key' => env('PAYSTACK_SECRET_KEY', ''),

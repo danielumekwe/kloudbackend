@@ -1,9 +1,9 @@
 @extends('layouts.auth')
-@section('title', 'Admin Sign In')
+@section('title', 'Reset Admin Password')
 
 @section('content')
-<h2 class="text-xl font-bold text-slate-900 dark:text-white mb-1">Admin</h2>
-<p class="text-sm text-slate-500 dark:text-slate-400 mb-7">Sign in to manage pricing</p>
+<h2 class="text-xl font-bold text-slate-900 dark:text-white mb-1">Choose a new admin password</h2>
+<p class="text-sm text-slate-500 dark:text-slate-400 mb-7">Enter a new password for the admin login</p>
 
 @if($errors->any())
 <div class="mb-5 flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
@@ -18,8 +18,9 @@
 </div>
 @endif
 
-<form method="POST" action="{{ route('admin.login') }}" x-data="{ loading: false }" @submit="loading = true">
+<form method="POST" action="{{ route('admin.password.update') }}" x-data="{ loading: false }" @submit="loading = true">
     @csrf
+    <input type="hidden" name="token" value="{{ $token }}">
 
     <div class="space-y-5">
         <div>
@@ -28,37 +29,37 @@
                    name="email"
                    type="email"
                    autocomplete="username"
-                   value="{{ old('email') }}"
+                   value="{{ old('email', $email) }}"
                    required
-                   autofocus
                    class="form-input"
                    placeholder="admin@example.com">
         </div>
 
         <div>
-            <label for="password" class="form-label">Admin password</label>
-            <input id="password"
-                   name="password"
-                   type="password"
-                   autocomplete="current-password"
-                   required
-                   class="form-input"
-                   placeholder="••••••••">
+            <label for="password" class="form-label">New password</label>
+            <input id="password" name="password" type="password"
+                   required minlength="8" class="form-input" placeholder="At least 8 characters">
+        </div>
+
+        <div>
+            <label for="password_confirmation" class="form-label">Confirm new password</label>
+            <input id="password_confirmation" name="password_confirmation" type="password"
+                   required minlength="8" class="form-input" placeholder="Repeat your new password">
         </div>
 
         <button type="submit"
                 :disabled="loading"
                 class="btn btn-primary w-full py-2.5 text-base">
-            <span x-show="!loading">Sign in</span>
+            <span x-show="!loading">Reset password</span>
             <span x-show="loading" class="flex items-center justify-center gap-2">
                 <div class="spinner"></div>
-                Signing in…
+                Resetting…
             </span>
         </button>
     </div>
 </form>
 
 <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-    <a href="{{ route('admin.password.request') }}" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Forgot password?</a>
+    <a href="{{ route('admin.login') }}" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Back to admin sign in</a>
 </p>
 @endsection

@@ -1,9 +1,15 @@
 @extends('layouts.auth')
-@section('title', 'Admin Sign In')
+@section('title', 'Admin Forgot Password')
 
 @section('content')
-<h2 class="text-xl font-bold text-slate-900 dark:text-white mb-1">Admin</h2>
-<p class="text-sm text-slate-500 dark:text-slate-400 mb-7">Sign in to manage pricing</p>
+<h2 class="text-xl font-bold text-slate-900 dark:text-white mb-1">Forgot the admin password?</h2>
+<p class="text-sm text-slate-500 dark:text-slate-400 mb-7">Enter the admin email and we'll send a reset link</p>
+
+@if(session('status'))
+<div class="mb-5 p-4 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20">
+    <p class="text-sm text-green-700 dark:text-green-400">{{ session('status') }}</p>
+</div>
+@endif
 
 @if($errors->any())
 <div class="mb-5 flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
@@ -18,7 +24,7 @@
 </div>
 @endif
 
-<form method="POST" action="{{ route('admin.login') }}" x-data="{ loading: false }" @submit="loading = true">
+<form method="POST" action="{{ route('admin.password.email') }}" x-data="{ loading: false }" @submit="loading = true">
     @csrf
 
     <div class="space-y-5">
@@ -30,35 +36,23 @@
                    autocomplete="username"
                    value="{{ old('email') }}"
                    required
-                   autofocus
                    class="form-input"
                    placeholder="admin@example.com">
-        </div>
-
-        <div>
-            <label for="password" class="form-label">Admin password</label>
-            <input id="password"
-                   name="password"
-                   type="password"
-                   autocomplete="current-password"
-                   required
-                   class="form-input"
-                   placeholder="••••••••">
         </div>
 
         <button type="submit"
                 :disabled="loading"
                 class="btn btn-primary w-full py-2.5 text-base">
-            <span x-show="!loading">Sign in</span>
+            <span x-show="!loading">Send reset link</span>
             <span x-show="loading" class="flex items-center justify-center gap-2">
                 <div class="spinner"></div>
-                Signing in…
+                Sending…
             </span>
         </button>
     </div>
 </form>
 
 <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-    <a href="{{ route('admin.password.request') }}" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Forgot password?</a>
+    <a href="{{ route('admin.login') }}" class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Back to admin sign in</a>
 </p>
 @endsection
