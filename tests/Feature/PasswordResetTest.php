@@ -3,11 +3,10 @@
 namespace Tests\Feature;
 
 use App\Mail\PasswordResetMail;
+use App\Models\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -15,26 +14,17 @@ class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function fakeWhmcsClient(string $email): void
+    private function makeClient(string $email): Client
     {
-        Http::fake(function (ClientRequest $request) use ($email) {
-            $action = $request->data()['action'] ?? null;
-
-            return match ($action) {
-                'GetClientsDetails' => Http::response([
-                    'result' => 'success',
-                    'client' => ['id' => 7, 'firstname' => 'Jane', 'email' => $email],
-                ]),
-                'UpdateClient' => Http::response(['result' => 'success']),
-                default => Http::response(['result' => 'error'], 404),
-            };
-        });
+        return Client::create([
+            'email' => $email, 'password' => Hash::make('old-password'),
+            'firstname' => 'Jane', 'lastname' => 'Doe',
+        ]);
     }
 
     public function test_reset_link_request_does_not_leak_whether_email_exists(): void
     {
         Mail::fake();
-        Http::fake(fn () => Http::response(['result' => 'error']));
 
         $response = $this->post('/password/forgot', ['email' => 'nobody@example.com']);
 
@@ -42,9 +32,21 @@ class PasswordResetTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_reset_link_request_sends_mail_for_a_known_email(): void
+    {
+        Mail::fake();
+        $this->makeClient('jane@example.com');
+
+        $response = $this->post('/password/forgot', ['email' => 'jane@example.com']);
+
+        $response->assertSessionHas('status');
+        Mail::assertSent(PasswordResetMail::class);
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => 'jane@example.com']);
+    }
+
     public function test_reset_password_rejects_an_expired_token(): void
     {
-        $this->fakeWhmcsClient('jane@example.com');
+        $this->makeClient('jane@example.com');
 
         $token = 'an-old-reset-token';
         DB::table('password_reset_tokens')->insert([
@@ -65,7 +67,7 @@ class PasswordResetTest extends TestCase
 
     public function test_reset_password_succeeds_with_a_valid_unexpired_token(): void
     {
-        $this->fakeWhmcsClient('jane@example.com');
+        $client = $this->makeClient('jane@example.com');
 
         $token = 'a-valid-reset-token';
         DB::table('password_reset_tokens')->insert([
@@ -83,5 +85,6 @@ class PasswordResetTest extends TestCase
 
         $response->assertRedirect(route('login'));
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'jane@example.com']);
+        $this->assertTrue($client->refresh()->checkPassword('brand-new-password'));
     }
 }

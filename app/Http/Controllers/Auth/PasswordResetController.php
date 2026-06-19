@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Mail\PasswordResetMail;
-use App\Services\WhmcsService;
+use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -17,8 +17,6 @@ class PasswordResetController extends Controller
 {
     private const TOKEN_TTL_MINUTES = 60;
 
-    public function __construct(private WhmcsService $whmcs) {}
-
     public function showForgot(): View
     {
         return view('auth.forgot-password');
@@ -28,23 +26,23 @@ class PasswordResetController extends Controller
     {
         $request->validate(['email' => ['required', 'email']]);
 
-        $result = $this->whmcs->getClientByEmail($request->email);
+        $client = Client::where('email', $request->email)->first();
 
-        if (($result['result'] ?? '') === 'success') {
+        if ($client) {
             $token = Str::random(64);
 
             DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $request->email],
+                ['email' => $client->email],
                 ['token' => Hash::make($token), 'created_at' => now()]
             );
 
             $resetUrl = route('password.reset', [
                 'token' => $token,
-                'email' => $request->email,
+                'email' => $client->email,
             ]);
 
-            Mail::to($request->email)->send(
-                new PasswordResetMail($resetUrl, $result['client']['firstname'] ?? 'there')
+            Mail::to($client->email)->send(
+                new PasswordResetMail($resetUrl, $client->firstname)
             );
         }
 
@@ -77,19 +75,13 @@ class PasswordResetController extends Controller
             return back()->withErrors(['email' => 'This password reset link is invalid or has expired.']);
         }
 
-        $client = $this->whmcs->getClientByEmail($request->email);
+        $client = Client::where('email', $request->email)->first();
 
-        if (($client['result'] ?? '') !== 'success') {
+        if (! $client) {
             return back()->withErrors(['email' => 'We couldn\'t find an account for that email.']);
         }
 
-        $clientId = (int) $client['client']['id'];
-
-        $update = $this->whmcs->updateClient($clientId, ['password2' => $request->password]);
-
-        if (($update['result'] ?? '') !== 'success') {
-            return back()->withErrors(['email' => $update['message'] ?? 'Could not reset password. Please try again.']);
-        }
+        $client->update(['password' => Hash::make($request->password)]);
 
         DB::table('password_reset_tokens')->where('email', $request->email)->delete();
 

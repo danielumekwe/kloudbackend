@@ -146,7 +146,7 @@ class CurrencyConverter
      * account, with no per-invoice override. Switches it via UpdateClient only when
      * our cached belief (session('whmcs_account_currency_id')) doesn't already match;
      * that session value is updated only here, on confirmed success, per the
-     * invariant documented in WhmcsAuth::ensureCurrencyDefault().
+     * invariant documented in ClientAuth::ensureCurrencyDefault().
      *
      * Returns false if a switch was needed but failed — callers MUST abort their
      * order flow without creating an invoice in that case, to avoid silently

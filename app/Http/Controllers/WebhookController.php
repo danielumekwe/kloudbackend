@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Services\FlutterwaveService;
 use App\Services\NowPaymentsService;
 use App\Services\PaymentService;
@@ -133,9 +134,15 @@ class WebhookController extends Controller
             return response()->json(['message' => 'Invoice not found'], 422);
         }
 
+        // invoice['userid'] is WHMCS's own client id, not necessarily our local one
+        // (they only coincide for clients migrated before the WHMCS exit) — resolve
+        // back to the local client via whmcs_client_id rather than storing WHMCS's
+        // id directly as payment_transactions.client_id.
+        $client = Client::where('whmcs_client_id', (int) ($invoice['userid'] ?? 0))->first();
+
         $result = $this->payments->recordPayment(
             invoiceId: $invoiceId,
-            clientId: (int) ($invoice['userid'] ?? 0),
+            clientId: $client?->id ?? 0,
             gateway: 'nowpayments',
             reference: (string) ($payload['payment_id'] ?? ''),
             amount: (float) ($payload['price_amount'] ?? 0),

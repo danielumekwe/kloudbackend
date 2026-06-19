@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\SslOrder;
 use App\Services\InterServerService;
 use App\Services\WhmcsService;
@@ -166,12 +167,21 @@ class SslController extends Controller
         $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
         $price        = round($priceUsd * $currencyRate, 2);
 
-        if (! CurrencyConverter::ensureClientCurrency($clientId, $currencyCode)) {
+        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
+        // whmcs_client_id, never the local id directly — they only coincide for
+        // clients migrated before the WHMCS exit (see the migration plan).
+        $whmcsClientId = Client::find($clientId)?->whmcs_client_id;
+
+        if (! $whmcsClientId) {
+            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
+        }
+
+        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
             return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
         }
 
         $invoice = $this->whmcs->createInvoice(
-            $clientId,
+            $whmcsClientId,
             "SSL Certificate — {$packageName} — {$validated['hostname']}",
             $price,
         );

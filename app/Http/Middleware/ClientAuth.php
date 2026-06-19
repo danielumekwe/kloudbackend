@@ -2,16 +2,14 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\WhmcsService;
+use App\Models\Client;
 use App\Support\CurrencyConverter;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class WhmcsAuth
+class ClientAuth
 {
-    public function __construct(private WhmcsService $whmcs) {}
-
     public function handle(Request $request, Closure $next): Response
     {
         if (session()->has('clientId')) {
@@ -22,15 +20,14 @@ class WhmcsAuth
         $rememberedId = $request->cookie('kloud101_remember');
 
         if ($rememberedId && is_numeric($rememberedId)) {
-            $client = $this->whmcs->getClientDetails((int) $rememberedId);
+            $client = Client::find((int) $rememberedId);
 
-            if (($client['result'] ?? '') === 'success') {
-                $data = $client['client'];
+            if ($client) {
                 session([
-                    'clientId'  => (int) $rememberedId,
-                    'firstName' => $data['firstname'] ?? '',
-                    'lastName'  => $data['lastname'] ?? '',
-                    'email'     => $data['email'] ?? '',
+                    'clientId'  => $client->id,
+                    'firstName' => $client->firstname,
+                    'lastName'  => $client->lastname,
+                    'email'     => $client->email,
                 ]);
                 $this->ensureCurrencyDefault();
                 return $next($request);
@@ -46,7 +43,8 @@ class WhmcsAuth
      * tblclients.currency is currently set to — updated only when
      * WhmcsService::switchClientCurrency() confirms success (see order controllers).
      * Nothing else in this app mutates a client's WHMCS currency, so this cache is
-     * safe to trust without re-fetching on every request.
+     * safe to trust without re-fetching on every request. Currency/invoicing are
+     * still WHMCS-backed (Phase 3 of the WHMCS exit), unlike client identity here.
      */
     private function ensureCurrencyDefault(): void
     {

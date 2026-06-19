@@ -2,12 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\Client;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BillingAccessControlTest extends TestCase
 {
+    use RefreshDatabase;
+
     private function fakeWhmcs(int $invoiceOwnerId): void
     {
         Http::fake(function (ClientRequest $request) use ($invoiceOwnerId) {
@@ -36,20 +40,30 @@ class BillingAccessControlTest extends TestCase
         });
     }
 
+    private function makeClient(?int $whmcsClientId): Client
+    {
+        return Client::create([
+            'email' => 'client-' . uniqid() . '@example.com', 'password' => 'x',
+            'firstname' => 'Jane', 'lastname' => 'Doe', 'whmcs_client_id' => $whmcsClientId,
+        ]);
+    }
+
     public function test_client_cannot_view_another_clients_invoice(): void
     {
+        $client = $this->makeClient(whmcsClientId: 7);
         $this->fakeWhmcs(invoiceOwnerId: 999);
 
-        $response = $this->withSession(['clientId' => 7])->get('/billing/42');
+        $response = $this->withSession(['clientId' => $client->id])->get('/billing/42');
 
         $response->assertStatus(404);
     }
 
     public function test_client_can_view_their_own_invoice(): void
     {
+        $client = $this->makeClient(whmcsClientId: 7);
         $this->fakeWhmcs(invoiceOwnerId: 7);
 
-        $response = $this->withSession(['clientId' => 7])->get('/billing/42');
+        $response = $this->withSession(['clientId' => $client->id])->get('/billing/42');
 
         $response->assertOk();
     }

@@ -37,7 +37,14 @@ class Admin extends Model
             return hash_equals(strtolower($this->password), md5($plain));
         }
 
-        return Hash::check($plain, $this->password);
+        // Hash::check() throws (rather than returning false) for a hash it doesn't
+        // recognize as bcrypt — guards against a typo'd phpMyAdmin edit crashing
+        // login with a 500 instead of just rejecting the password.
+        try {
+            return Hash::check($plain, $this->password);
+        } catch (\RuntimeException) {
+            return false;
+        }
     }
 
     public function hasTwoFactorEnabled(): bool

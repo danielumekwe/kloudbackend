@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\DomainOrder;
 use App\Models\DomainRenewal;
 use App\Services\InterServerService;
@@ -160,12 +161,21 @@ class DomainsController extends Controller
         $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
         $price        = round($priceUsd * $currencyRate, 2);
 
-        if (! CurrencyConverter::ensureClientCurrency($clientId, $currencyCode)) {
+        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
+        // whmcs_client_id, never the local id directly — they only coincide for
+        // clients migrated before the WHMCS exit (see the migration plan).
+        $whmcsClientId = Client::find($clientId)?->whmcs_client_id;
+
+        if (! $whmcsClientId) {
+            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
+        }
+
+        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
             return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
         }
 
         $invoice = $this->whmcs->createInvoice(
-            $clientId,
+            $whmcsClientId,
             "Domain Registration — {$validated['domain']} ({$validated['registration_years']}yr)",
             $price,
         );
@@ -214,12 +224,21 @@ class DomainsController extends Controller
         $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
         $price        = round($priceUsd * $currencyRate, 2);
 
-        if (! CurrencyConverter::ensureClientCurrency($clientId, $currencyCode)) {
+        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
+        // whmcs_client_id, never the local id directly — they only coincide for
+        // clients migrated before the WHMCS exit (see the migration plan).
+        $whmcsClientId = Client::find($clientId)?->whmcs_client_id;
+
+        if (! $whmcsClientId) {
+            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
+        }
+
+        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
             return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
         }
 
         $invoice = $this->whmcs->createInvoice(
-            $clientId,
+            $whmcsClientId,
             "Domain Transfer — {$validated['domain']}",
             $price,
         );
@@ -509,15 +528,24 @@ class DomainsController extends Controller
         $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
         $price        = round($priceUsd * $currencyRate, 2);
 
+        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
+        // whmcs_client_id, never the local id directly — they only coincide for
+        // clients migrated before the WHMCS exit (see the migration plan).
+        $whmcsClientId = Client::find($order->client_id)?->whmcs_client_id;
+
+        if (! $whmcsClientId) {
+            return response()->json(['success' => false, 'message' => 'We\'re still setting up your billing account. Please try again shortly or contact support.'], 422);
+        }
+
         // Renewal currency intentionally tracks the client's *current* session currency,
         // not whatever the original order/domain was invoiced in — each renewal is its
         // own transaction and the client may have switched currency since.
-        if (! CurrencyConverter::ensureClientCurrency($order->client_id, $currencyCode)) {
+        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
             return response()->json(['success' => false, 'message' => 'Could not switch your billing currency. Please try again or contact support.'], 422);
         }
 
         $invoice = $this->whmcs->createInvoice(
-            $order->client_id,
+            $whmcsClientId,
             "Domain Renewal — {$order->domain_name}.{$order->tld} ({$validated['years']}yr)",
             $price,
         );

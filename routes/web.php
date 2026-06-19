@@ -61,9 +61,9 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
 
 // -------------------------------------------------------------------------
-// Dashboard (protected by WhmcsAuth middleware)
+// Dashboard (protected by ClientAuth middleware)
 // -------------------------------------------------------------------------
-Route::middleware('whmcs.auth')->group(function () {
+Route::middleware('client.auth')->group(function () {
 
     Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard');
 

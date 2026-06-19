@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Services\WhmcsService;
 use Illuminate\View\View;
 
@@ -12,19 +13,22 @@ class BillingController extends Controller
 
     public function index(): View
     {
-        $clientId = session('clientId');
-        $invoices = $this->whmcs->getInvoices($clientId);
-        $details  = $this->whmcs->getClientDetails($clientId);
-        $credit   = $details['client']['credit'] ?? '0.00';
+        $client = Client::findOrFail(session('clientId'));
+        $invoices = $client->whmcs_client_id ? $this->whmcs->getInvoices($client->whmcs_client_id) : [];
+        $credit = (float) $client->credit_balance;
 
         return view('dashboard.billing.index', compact('invoices', 'credit'));
     }
 
     public function show(int $id): View
     {
+        $client = Client::findOrFail(session('clientId'));
         $invoice = $this->whmcs->getInvoice($id);
 
-        if (($invoice['result'] ?? '') !== 'success' || (int) ($invoice['userid'] ?? 0) !== (int) session('clientId')) {
+        // invoice['userid'] is WHMCS's own client id, not necessarily our local one
+        // (they only coincide for clients migrated before the WHMCS exit) — compare
+        // against the client's tracked whmcs_client_id, never against the local id.
+        if (($invoice['result'] ?? '') !== 'success' || (int) ($invoice['userid'] ?? 0) !== (int) $client->whmcs_client_id) {
             abort(404, 'Invoice not found.');
         }
 

@@ -257,7 +257,7 @@
             <p class="text-sm font-semibold text-slate-900 dark:text-white mb-1">Wallet</p>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Available account credit</p>
             <p class="text-3xl font-bold text-slate-900 dark:text-white mb-4">
-                ${{ number_format((float)($client['credit'] ?? 0), 2) }}
+                ${{ number_format((float)($client['credit_balance'] ?? 0), 2) }}
             </p>
             <a href="{{ route('billing.index') }}" class="btn btn-secondary w-full text-sm justify-center">
                 View Billing

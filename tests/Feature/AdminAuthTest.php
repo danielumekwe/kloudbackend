@@ -14,6 +14,13 @@ class AdminAuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_login_fails_safely_for_an_unrecognized_password_hash_format(): void
+    {
+        $admin = Admin::create(['email' => 'admin@admin.com', 'password' => 'not-a-real-hash']);
+
+        $this->assertFalse($admin->checkPassword('anything'));
+    }
+
     public function test_login_succeeds_with_a_legacy_md5_password(): void
     {
         Admin::create(['email' => 'admin@admin.com', 'password' => md5('12345678')]);

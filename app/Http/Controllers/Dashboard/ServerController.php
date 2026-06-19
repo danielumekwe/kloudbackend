@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Services\WhmcsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,7 @@ class ServerController extends Controller
 
     public function index(): View
     {
-        $services = $this->whmcs->getClientServices(session('clientId'));
+        $services = $this->whmcsClientId() ? $this->whmcs->getClientServices($this->whmcsClientId()) : [];
         return view('dashboard.servers.index', compact('services'));
     }
 
@@ -79,12 +80,22 @@ class ServerController extends Controller
      */
     private function ensureOwnsService(int $id): void
     {
-        $services = $this->whmcs->getClientServices(session('clientId'));
+        $services = $this->whmcsClientId() ? $this->whmcs->getClientServices($this->whmcsClientId()) : [];
 
         $owns = collect($services)->contains(fn (array $service) => (int) ($service['id'] ?? 0) === $id);
 
         if (! $owns) {
             abort(404, 'Service not found.');
         }
+    }
+
+    /**
+     * Resolves through whmcs_client_id, never the local session clientId directly —
+     * they only coincide for clients migrated before the WHMCS exit. Null if this
+     * client has no WHMCS shadow record (yet).
+     */
+    private function whmcsClientId(): ?int
+    {
+        return Client::find(session('clientId'))?->whmcs_client_id;
     }
 }

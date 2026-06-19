@@ -3,20 +3,19 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Services\WhmcsService;
+use App\Models\Client;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
-    public function __construct(private WhmcsService $whmcs) {}
-
     public function index(): View
     {
-        $details = $this->whmcs->getClientDetails(session('clientId'));
-        $client  = $details['client'] ?? [];
-        return view('dashboard.profile.index', compact('client'));
+        $client = Client::findOrFail(session('clientId'));
+
+        return view('dashboard.profile.index', ['client' => $client]);
     }
 
     public function update(Request $request): RedirectResponse
@@ -24,7 +23,7 @@ class ProfileController extends Controller
         $request->validate([
             'firstname'   => ['required', 'string', 'max:100'],
             'lastname'    => ['required', 'string', 'max:100'],
-            'email'       => ['required', 'email', 'max:200'],
+            'email'       => ['required', 'email', 'max:200', 'unique:clients,email,' . session('clientId')],
             'phonenumber' => ['required', 'string', 'max:30'],
             'address1'    => ['required', 'string', 'max:200'],
             'city'        => ['required', 'string', 'max:100'],
@@ -33,7 +32,9 @@ class ProfileController extends Controller
             'country'     => ['required', 'string', 'size:2'],
         ]);
 
-        $result = $this->whmcs->updateClient(session('clientId'), [
+        $client = Client::findOrFail(session('clientId'));
+
+        $client->update([
             'firstname'   => $request->firstname,
             'lastname'    => $request->lastname,
             'email'       => $request->email,
@@ -45,16 +46,10 @@ class ProfileController extends Controller
             'country'     => strtoupper($request->country),
         ]);
 
-        if (($result['result'] ?? '') !== 'success') {
-            return back()
-                ->withInput()
-                ->with('error', $result['message'] ?? 'Failed to update profile. Please try again.');
-        }
-
         session([
-            'firstName' => $request->firstname,
-            'lastName'  => $request->lastname,
-            'email'     => $request->email,
+            'firstName' => $client->firstname,
+            'lastName'  => $client->lastname,
+            'email'     => $client->email,
         ]);
 
         return back()->with('success', 'Profile updated successfully.');
@@ -66,13 +61,7 @@ class ProfileController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $result = $this->whmcs->updateClient(session('clientId'), [
-            'password2' => $request->password,
-        ]);
-
-        if (($result['result'] ?? '') !== 'success') {
-            return back()->with('error', $result['message'] ?? 'Failed to update password. Please try again.');
-        }
+        Client::findOrFail(session('clientId'))->update(['password' => Hash::make($request->password)]);
 
         return back()->with('success', 'Password changed successfully.');
     }
