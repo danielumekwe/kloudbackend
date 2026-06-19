@@ -20,6 +20,8 @@ class ServerController extends Controller
 
     public function show(int $id): View
     {
+        $this->ensureOwnsService($id);
+
         $service = $this->whmcs->getServiceDetails($id);
 
         if (empty($service)) {
@@ -31,6 +33,8 @@ class ServerController extends Controller
 
     public function action(Request $request, int $id): JsonResponse
     {
+        $this->ensureOwnsService($id);
+
         $request->validate([
             'command'  => ['required', 'string', 'in:poweron,poweroff,reboot,reinstall,changepassword,suspend,unsuspend'],
             'password' => ['nullable', 'string', 'min:8'],
@@ -64,5 +68,23 @@ class ServerController extends Controller
             'success' => true,
             'message' => $labels[$request->command] ?? 'Action completed successfully.',
         ]);
+    }
+
+    /**
+     * GetClientsProducts (single, by serviceid) takes no clientid filter, so without
+     * this check any logged-in client could power off/reinstall/change the root
+     * password of any other client's server just by guessing its id.
+     * GetClientsProducts(clientid) is the one WHMCS endpoint that's actually scoped,
+     * so it doubles as the ownership check here.
+     */
+    private function ensureOwnsService(int $id): void
+    {
+        $services = $this->whmcs->getClientServices(session('clientId'));
+
+        $owns = collect($services)->contains(fn (array $service) => (int) ($service['id'] ?? 0) === $id);
+
+        if (! $owns) {
+            abort(404, 'Service not found.');
+        }
     }
 }

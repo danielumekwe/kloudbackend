@@ -24,7 +24,7 @@ class BillingController extends Controller
     {
         $invoice = $this->whmcs->getInvoice($id);
 
-        if (($invoice['result'] ?? '') !== 'success') {
+        if (($invoice['result'] ?? '') !== 'success' || (int) ($invoice['userid'] ?? 0) !== (int) session('clientId')) {
             abort(404, 'Invoice not found.');
         }
 

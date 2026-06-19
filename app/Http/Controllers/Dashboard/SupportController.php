@@ -53,6 +53,8 @@ class SupportController extends Controller
 
     public function show(int $id): View
     {
+        $this->ensureOwnsTicket($id);
+
         $ticket = $this->whmcs->getTicket($id);
 
         if (($ticket['result'] ?? '') !== 'success') {
@@ -64,6 +66,8 @@ class SupportController extends Controller
 
     public function reply(Request $request, int $id): RedirectResponse
     {
+        $this->ensureOwnsTicket($id);
+
         $request->validate([
             'message' => ['required', 'string', 'min:5'],
         ]);
@@ -82,6 +86,8 @@ class SupportController extends Controller
 
     public function close(int $id): RedirectResponse
     {
+        $this->ensureOwnsTicket($id);
+
         $result = $this->whmcs->closeTicket($id);
 
         if (($result['result'] ?? '') !== 'success') {
@@ -90,5 +96,22 @@ class SupportController extends Controller
 
         return redirect()->route('support.index')
             ->with('success', 'Ticket closed successfully.');
+    }
+
+    /**
+     * GetTicket (single) takes no clientid filter, so without this check any logged-in
+     * client could read/reply-to/close any other client's ticket by guessing its id.
+     * GetTickets(clientid) is the one WHMCS endpoint that's actually scoped, so it
+     * doubles as the ownership check here.
+     */
+    private function ensureOwnsTicket(int $id): void
+    {
+        $tickets = $this->whmcs->getTickets(session('clientId'));
+
+        $owns = collect($tickets)->contains(fn (array $ticket) => (int) ($ticket['id'] ?? 0) === $id);
+
+        if (! $owns) {
+            abort(404, 'Ticket not found.');
+        }
     }
 }
