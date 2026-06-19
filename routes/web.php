@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminPricingController;
+use App\Http\Controllers\Admin\AdminTwoFactorController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -175,9 +177,34 @@ Route::prefix('admin')->group(function () {
     Route::get('/reset-password/{token}', [AdminAuthController::class, 'showReset'])->name('admin.password.reset');
     Route::post('/reset-password', [AdminAuthController::class, 'resetPassword'])->name('admin.password.update')->middleware('throttle:6,1');
 
+    // 2FA login challenge — reached mid-login, before isAdmin is set (see AdminAuthController::login).
+    Route::get('/two-factor-challenge',  [AdminAuthController::class, 'showTwoFactorChallenge'])->name('admin.two-factor.challenge');
+    Route::post('/two-factor-challenge', [AdminAuthController::class, 'verifyTwoFactorChallenge'])->name('admin.two-factor.verify')->middleware('throttle:6,1');
+
     Route::middleware('admin.auth')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
-        Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
-        Route::post('/pricing', [AdminPricingController::class, 'update'])->name('admin.pricing.update');
+
+        // Self-service 2FA management — any admin can secure their own account.
+        Route::get('/security',  [AdminTwoFactorController::class, 'show'])->name('admin.security');
+        Route::get('/security/two-factor/setup',   [AdminTwoFactorController::class, 'setup'])->name('admin.security.two-factor.setup');
+        Route::post('/security/two-factor/confirm', [AdminTwoFactorController::class, 'confirm'])->name('admin.security.two-factor.confirm');
+        Route::post('/security/two-factor/disable', [AdminTwoFactorController::class, 'disable'])->name('admin.security.two-factor.disable');
+        Route::post('/security/two-factor/recovery-codes', [AdminTwoFactorController::class, 'regenerateRecoveryCodes'])->name('admin.security.two-factor.recovery-codes');
+
+        Route::middleware('admin.role:super_admin,finance_manager')->group(function () {
+            Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
+            Route::post('/pricing', [AdminPricingController::class, 'update'])->name('admin.pricing.update');
+        });
+
+        // Admin account + role management — restricted to Super Admin so no other
+        // role can grant itself (or anyone) elevated access.
+        Route::middleware('admin.role:super_admin')->prefix('users')->group(function () {
+            Route::get('/',           [AdminUserController::class, 'index'])->name('admin.users.index');
+            Route::get('/create',     [AdminUserController::class, 'create'])->name('admin.users.create');
+            Route::post('/',          [AdminUserController::class, 'store'])->name('admin.users.store');
+            Route::get('/{admin}/edit', [AdminUserController::class, 'edit'])->name('admin.users.edit');
+            Route::put('/{admin}',    [AdminUserController::class, 'update'])->name('admin.users.update');
+            Route::delete('/{admin}', [AdminUserController::class, 'destroy'])->name('admin.users.destroy');
+        });
     });
 });

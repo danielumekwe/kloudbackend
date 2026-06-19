@@ -127,6 +127,9 @@
                     Dashboard
                 </a>
 
+                @php($role = \App\Enums\AdminRole::tryFrom(session('adminRole')))
+
+                @if($role?->canManagePricing())
                 <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Catalog</p>
 
                 <a href="{{ route('admin.pricing') }}"
@@ -137,6 +140,29 @@
                     </svg>
                     Pricing
                 </a>
+                @endif
+
+                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Settings</p>
+
+                <a href="{{ route('admin.security') }}"
+                   class="nav-link {{ request()->routeIs('admin.security*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 10-8 0v4h8z"/>
+                    </svg>
+                    Security
+                </a>
+
+                @if($role?->canManageAdmins())
+                <a href="{{ route('admin.users.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 100-8"/>
+                    </svg>
+                    Admin Users
+                </a>
+                @endif
 
                 <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">External</p>
 
@@ -156,8 +182,8 @@
                         A
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-slate-900 dark:text-white truncate">Administrator</div>
-                        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">Kloud101 Admin</div>
+                        <div class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ session('adminEmail', 'Administrator') }}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ $role?->label() ?? 'Kloud101 Admin' }}</div>
                     </div>
                 </div>
                 <form method="POST" action="{{ route('admin.logout') }}">

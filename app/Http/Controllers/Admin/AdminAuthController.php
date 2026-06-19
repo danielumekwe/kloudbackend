@@ -12,10 +12,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use PragmaRX\Google2FA\Google2FA;
 
 class AdminAuthController extends Controller
 {
     private const TOKEN_TTL_MINUTES = 60;
+
+    public function __construct(private Google2FA $google2fa) {}
 
     public function showLogin(): View
     {
@@ -35,17 +38,90 @@ class AdminAuthController extends Controller
             return back()->withErrors(['email' => 'Invalid email or password.'])->onlyInput('email');
         }
 
-        session()->regenerate();
-        session(['isAdmin' => true, 'adminId' => $admin->id, 'adminEmail' => $admin->email]);
+        if ($admin->hasTwoFactorEnabled()) {
+            // Not logged in yet — isAdmin is intentionally not set until the code below
+            // verifies. Regenerating the session id now still avoids fixation.
+            session()->regenerate();
+            session(['admin_2fa_pending' => $admin->id]);
+
+            return redirect()->route('admin.two-factor.challenge');
+        }
+
+        $this->completeLogin($admin);
+
+        return redirect()->intended(route('admin.dashboard'));
+    }
+
+    public function showTwoFactorChallenge(): View|RedirectResponse
+    {
+        if (! session('admin_2fa_pending')) {
+            return redirect()->route('admin.login');
+        }
+
+        return view('admin.two-factor-challenge');
+    }
+
+    public function verifyTwoFactorChallenge(Request $request): RedirectResponse
+    {
+        $adminId = session('admin_2fa_pending');
+
+        if (! $adminId) {
+            return redirect()->route('admin.login');
+        }
+
+        $admin = Admin::find($adminId);
+
+        if (! $admin) {
+            session()->forget('admin_2fa_pending');
+
+            return redirect()->route('admin.login');
+        }
+
+        $request->validate(['code' => ['required', 'string']]);
+        $code = str_replace(' ', '', $request->code);
+
+        $verified = $this->google2fa->verifyKey($admin->two_factor_secret, $code)
+            || $this->consumeRecoveryCode($admin, $code);
+
+        if (! $verified) {
+            return back()->withErrors(['code' => 'That code is invalid or has expired.']);
+        }
+
+        session()->forget('admin_2fa_pending');
+        $this->completeLogin($admin);
 
         return redirect()->intended(route('admin.dashboard'));
     }
 
     public function logout(Request $request): RedirectResponse
     {
-        $request->session()->forget(['isAdmin', 'adminId', 'adminEmail']);
+        $request->session()->forget(['isAdmin', 'adminId', 'adminEmail', 'adminRole']);
 
         return redirect()->route('admin.login');
+    }
+
+    private function completeLogin(Admin $admin): void
+    {
+        session()->regenerate();
+        session([
+            'isAdmin'    => true,
+            'adminId'    => $admin->id,
+            'adminEmail' => $admin->email,
+            'adminRole'  => $admin->role->value,
+        ]);
+    }
+
+    private function consumeRecoveryCode(Admin $admin, string $code): bool
+    {
+        $codes = $admin->two_factor_recovery_codes ?? [];
+
+        if (! in_array($code, $codes, true)) {
+            return false;
+        }
+
+        $admin->update(['two_factor_recovery_codes' => array_values(array_diff($codes, [$code]))]);
+
+        return true;
     }
 
     public function showForgot(): View

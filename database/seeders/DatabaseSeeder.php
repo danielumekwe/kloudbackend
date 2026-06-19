@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AdminRole;
 use App\Models\Admin;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -27,7 +28,7 @@ class DatabaseSeeder extends Seeder
         // directly in the DB) before this app is exposed publicly.
         Admin::firstOrCreate(
             ['email' => 'admin@admin.com'],
-            ['password' => md5('12345678')]
+            ['password' => md5('12345678'), 'role' => AdminRole::SuperAdmin->value]
         );
     }
 }
