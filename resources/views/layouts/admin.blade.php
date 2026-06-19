@@ -118,7 +118,16 @@
             {{-- Navigation --}}
             <nav class="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
 
-                <p class="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Catalog</p>
+                <a href="{{ route('admin.dashboard') }}"
+                   class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+                    </svg>
+                    Dashboard
+                </a>
+
+                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Catalog</p>
 
                 <a href="{{ route('admin.pricing') }}"
                    class="nav-link {{ request()->routeIs('admin.pricing') ? 'active' : '' }}">

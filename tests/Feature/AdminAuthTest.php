@@ -20,7 +20,7 @@ class AdminAuthTest extends TestCase
 
         $response = $this->post('/admin/login', ['email' => 'admin@admin.com', 'password' => '12345678']);
 
-        $response->assertRedirect(route('admin.pricing'));
+        $response->assertRedirect(route('admin.dashboard'));
         $this->assertTrue(session('isAdmin'));
     }
 
@@ -30,7 +30,7 @@ class AdminAuthTest extends TestCase
 
         $response = $this->post('/admin/login', ['email' => 'admin@admin.com', 'password' => 'a-strong-password']);
 
-        $response->assertRedirect(route('admin.pricing'));
+        $response->assertRedirect(route('admin.dashboard'));
         $this->assertTrue(session('isAdmin'));
     }
 

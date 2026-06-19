@@ -213,6 +213,41 @@ class WhmcsService
         return $this->call('GetInvoice', ['invoiceid' => $invoiceId]);
     }
 
+    /**
+     * Admin-wide invoice count for a given status, e.g. for dashboard stat cards.
+     * limitnum=1 keeps this cheap — we only read the `totalresults` count, not the
+     * actual invoice rows.
+     */
+    public function getInvoiceCountByStatus(string $status): int
+    {
+        $response = $this->call('GetInvoices', ['status' => $status, 'limitnum' => 1]);
+
+        if (($response['result'] ?? '') !== 'success') {
+            return 0;
+        }
+
+        return (int) ($response['totalresults'] ?? count($this->normalizeList($response['invoices']['invoice'] ?? [])));
+    }
+
+    /**
+     * Raw unpaid + overdue invoices, capped at 200 of each (a single page) to keep
+     * this cheap on every dashboard load. Returns the raw rows (with `currencycode`)
+     * rather than a sum, since invoices can be in different currencies and only the
+     * caller knows how to convert those to a common base — see
+     * CurrencyConverter::convertToUsd(). On accounts with more outstanding invoices
+     * than 200+200, this undercounts — it's a dashboard estimate, not a ledger total.
+     */
+    public function getOutstandingInvoices(): array
+    {
+        $unpaid = $this->call('GetInvoices', ['status' => 'Unpaid', 'limitnum' => 200]);
+        $overdue = $this->call('GetInvoices', ['status' => 'Overdue', 'limitnum' => 200]);
+
+        return array_merge(
+            $this->normalizeList($unpaid['invoices']['invoice'] ?? []),
+            $this->normalizeList($overdue['invoices']['invoice'] ?? [])
+        );
+    }
+
     public function createInvoice(int $clientId, string $description, float $amount): array
     {
         return $this->call('CreateInvoice', [
@@ -244,6 +279,21 @@ class WhmcsService
     // -------------------------------------------------------------------------
     // Support Tickets
     // -------------------------------------------------------------------------
+
+    /**
+     * Admin-wide open ticket count (no clientid filter) for dashboard stat cards.
+     * limitnum=1 keeps this cheap — we only read the `totalresults` count.
+     */
+    public function getOpenTicketCount(): int
+    {
+        $response = $this->call('GetTickets', ['status' => 'Open', 'limitnum' => 1]);
+
+        if (($response['result'] ?? '') !== 'success') {
+            return 0;
+        }
+
+        return (int) ($response['totalresults'] ?? count($this->normalizeList($response['tickets']['ticket'] ?? [])));
+    }
 
     public function getSupportDepartments(): array
     {

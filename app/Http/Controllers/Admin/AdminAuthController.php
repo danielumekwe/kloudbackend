@@ -38,7 +38,7 @@ class AdminAuthController extends Controller
         session()->regenerate();
         session(['isAdmin' => true, 'adminId' => $admin->id, 'adminEmail' => $admin->email]);
 
-        return redirect()->intended(route('admin.pricing'));
+        return redirect()->intended(route('admin.dashboard'));
     }
 
     public function logout(Request $request): RedirectResponse

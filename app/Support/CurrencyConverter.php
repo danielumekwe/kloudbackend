@@ -102,6 +102,18 @@ class CurrencyConverter
      * concatenate the symbol and amount themselves rather than calling format().
      * Falls back to "CODE " when the currency has no prefix configured.
      */
+    /**
+     * Inverse of convertFromUsd() — used for aggregating amounts that were charged
+     * in different currencies (e.g. dashboard revenue totals) onto a common USD
+     * base. Never used for invoicing math, only for reporting.
+     */
+    public static function convertToUsd(float $amount, string $code): float
+    {
+        $rate = self::rate($code);
+
+        return $rate > 0 ? round($amount / $rate, 2) : $amount;
+    }
+
     public static function symbol(string $code): string
     {
         $currency = self::find($code) ?? self::default();

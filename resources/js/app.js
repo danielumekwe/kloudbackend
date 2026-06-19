@@ -1,5 +1,9 @@
 import Alpine from 'alpinejs';
 import axios from 'axios';
+import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js';
+
+Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip);
+window.Chart = Chart;
 
 // -----------------------------------------------------------------------
 // Axios global defaults

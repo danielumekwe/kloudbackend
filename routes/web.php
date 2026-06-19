@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminAuthController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminPricingController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
@@ -175,6 +176,7 @@ Route::prefix('admin')->group(function () {
     Route::post('/reset-password', [AdminAuthController::class, 'resetPassword'])->name('admin.password.update')->middleware('throttle:6,1');
 
     Route::middleware('admin.auth')->group(function () {
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
         Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
         Route::post('/pricing', [AdminPricingController::class, 'update'])->name('admin.pricing.update');
     });
