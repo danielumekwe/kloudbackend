@@ -4,6 +4,20 @@
 
 @section('content')
 
+@unless($client->isEmailVerified())
+<div class="flex items-center justify-between gap-4 flex-wrap mb-6 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+    <p class="text-sm text-amber-800 dark:text-amber-400">
+        <strong>Verify your email address</strong> — we sent a link to {{ $client->email }} when you signed up.
+    </p>
+    <form method="POST" action="{{ route('verification.resend') }}">
+        @csrf
+        <button type="submit" class="text-sm font-medium text-amber-800 dark:text-amber-400 hover:underline whitespace-nowrap">
+            Resend email
+        </button>
+    </form>
+</div>
+@endunless
+
 {{-- Welcome banner --}}
 <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 px-6 py-7 mb-6 shadow-lg shadow-blue-900/20">
     <div class="absolute -top-10 -right-10 w-56 h-56 rounded-full bg-white/10 blur-2xl"></div>
@@ -237,11 +251,11 @@
             <p class="text-xs text-slate-400 mb-4">Reference this ID when contacting support for faster assistance.</p>
             <div class="flex items-center gap-2">
                 <div class="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                    <span class="text-xl font-mono font-bold text-white tracking-widest">#{{ $clientId }}</span>
+                    <span class="text-xl font-mono font-bold text-white tracking-widest">{{ $client->accountCode() }}</span>
                 </div>
                 <button type="button"
                         x-data
-                        @click="navigator.clipboard.writeText('{{ $clientId }}'); $store.toast.add('Account ID copied to clipboard', 'success')"
+                        @click="navigator.clipboard.writeText('{{ $client->accountCode() }}'); $store.toast.add('Account ID copied to clipboard', 'success')"
                         class="w-11 h-11 flex-shrink-0 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center
                                text-slate-300 hover:text-white hover:bg-white/10 transition-colors">
                     <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

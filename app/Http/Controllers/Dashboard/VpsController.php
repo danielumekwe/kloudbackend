@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Mail\OrderConfirmationMail;
 use App\Models\Client;
 use App\Models\VpsOrder;
 use App\Services\InterServerService;
@@ -13,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class VpsController extends Controller
@@ -198,7 +200,8 @@ class VpsController extends Controller
         // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
         // whmcs_client_id, never the local id directly — they only coincide for
         // clients migrated before the WHMCS exit (see the migration plan).
-        $whmcsClientId = Client::find($clientId)?->whmcs_client_id;
+        $client = Client::find($clientId);
+        $whmcsClientId = $client?->whmcs_client_id;
 
         if (! $whmcsClientId) {
             return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
@@ -208,9 +211,11 @@ class VpsController extends Controller
             return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
         }
 
+        $orderDescription = "{$plan['label']} — {$validated['slices']} slice(s) — {$validated['hostname']}";
+
         $invoice = $this->whmcs->createInvoice(
             $whmcsClientId,
-            "{$plan['label']} — {$validated['slices']} slice(s) — {$validated['hostname']}",
+            $orderDescription,
             $price,
         );
 
@@ -240,6 +245,14 @@ class VpsController extends Controller
                 'amount_usd'   => $priceUsd, // USD cost basis for InterServer reconciliation, independent of rate drift
             ],
         ]);
+
+        Mail::to($client->email)->send(new OrderConfirmationMail(
+            $client->firstname,
+            $orderDescription,
+            $price,
+            $currencyCode,
+            $invoice['invoiceid'],
+        ));
 
         return redirect()->route('billing.show', $invoice['invoiceid'])
             ->with('success', 'Your order has been created. Your VPS will be provisioned automatically as soon as this invoice is paid.');

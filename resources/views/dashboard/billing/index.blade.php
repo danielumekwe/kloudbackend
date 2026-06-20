@@ -79,8 +79,30 @@
         </div>
     </div>
 
-    {{-- Invoices table --}}
-    <div class="card !p-0 overflow-hidden">
+    {{-- Mobile: stacked cards --}}
+    <div class="space-y-3 sm:hidden">
+        <h3 class="font-semibold text-slate-900 dark:text-white px-1">All Invoices</h3>
+        @foreach($invoices as $invoice)
+        @php $st = strtolower($invoice['status'] ?? ''); @endphp
+        <a href="{{ route('billing.show', $invoice['id']) }}" class="card block">
+            <div class="flex items-start justify-between gap-3 mb-2">
+                <p class="font-medium text-slate-900 dark:text-white">#{{ $invoice['id'] }}</p>
+                <span class="badge badge-{{ $st === 'paid' ? 'paid' : ($st === 'unpaid' ? 'unpaid' : 'cancelled') }} flex-shrink-0">
+                    {{ $invoice['status'] ?? '' }}
+                </span>
+            </div>
+            <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                {{ $invoice['currencycode'] ?? '' }} {{ number_format((float)($invoice['total'] ?? 0), 2) }}
+            </p>
+            <p class="text-xs {{ $st === 'unpaid' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-slate-500 dark:text-slate-400' }} mt-1">
+                Due {{ $invoice['duedate'] ?? '—' }}
+            </p>
+        </a>
+        @endforeach
+    </div>
+
+    {{-- Desktop / tablet: full table --}}
+    <div class="card !p-0 overflow-hidden hidden sm:block">
         <div class="px-5 py-4 border-b border-slate-100 dark:border-white/[0.06]">
             <h3 class="font-semibold text-slate-900 dark:text-white">All Invoices</h3>
         </div>

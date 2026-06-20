@@ -36,6 +36,24 @@
             @csrf
 
             <div class="space-y-5">
+                {{-- Product --}}
+                <div>
+                    <label for="service" class="form-label">Product (optional)</label>
+                    @if(empty($services))
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">You don't have any active services yet.</p>
+                    @else
+                        <select id="service" name="service" class="form-input">
+                            <option value="">Not related to a specific service…</option>
+                            @foreach($services as $svc)
+                                @php($value = "{$svc['type']}:{$svc['id']}")
+                                <option value="{{ $value }}" {{ old('service') === $value ? 'selected' : '' }}>
+                                    {{ $svc['label'] }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @endif
+                </div>
+
                 {{-- Department --}}
                 <div>
                     <label for="deptid" class="form-label">Department</label>

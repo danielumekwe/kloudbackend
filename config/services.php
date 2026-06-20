@@ -81,4 +81,18 @@ return [
         'url'         => env('NOWPAYMENTS_URL', 'https://api.nowpayments.io/v1'),
     ],
 
+    // Folded into a client's local id to produce the customer-facing account code
+    // (see App\Models\Client::accountCode) — keeps it short, stable, and reversible
+    // without a DB column, while not revealing the sequential id / customer count.
+    'account_codes' => [
+        'salt' => (int) env('ACCOUNT_CODE_SALT', 0),
+    ],
+
+    // Same idea as account_codes, but for support ticket reference numbers (see
+    // App\Models\SupportTicket::ticketCode) — a separate salt so ticket codes and
+    // account codes can't be correlated with each other.
+    'ticket_codes' => [
+        'salt' => (int) env('TICKET_CODE_SALT', 0),
+    ],
+
 ];

@@ -45,12 +45,21 @@ document.addEventListener('alpine:init', () => {
 window.appLayout = function () {
     return {
         darkMode: document.documentElement.classList.contains('dark'),
+        isDesktop: window.innerWidth >= 1024,
         sidebarOpen: window.innerWidth >= 1024,
 
         init() {
+            // Only flip sidebar state when actually crossing the lg breakpoint —
+            // otherwise a manual toggle on mobile would get fought by the next
+            // unrelated resize (e.g. a scrollbar appearing). Without this, shrinking
+            // an already-loaded desktop window below 1024px left the sidebar stuck
+            // in its desktop "open" state: `sidebarOpen` was only ever forced true on
+            // the way back up past 1024px, never false on the way down.
             window.addEventListener('resize', () => {
-                if (window.innerWidth >= 1024) {
-                    this.sidebarOpen = true;
+                const desktopNow = window.innerWidth >= 1024;
+                if (desktopNow !== this.isDesktop) {
+                    this.isDesktop = desktopNow;
+                    this.sidebarOpen = desktopNow;
                 }
             });
         },

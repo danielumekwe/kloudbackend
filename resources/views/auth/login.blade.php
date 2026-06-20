@@ -5,12 +5,24 @@
 <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-1">Welcome back</h2>
 <p class="text-sm text-slate-500 dark:text-slate-400 mb-7">Sign in to your Kloud101 account</p>
 
-@if($errors->any())
+@if(session('success'))
+<div class="mb-5 flex items-start gap-3 p-4 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20">
+    <svg class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <p class="text-sm text-green-700 dark:text-green-400">{{ session('success') }}</p>
+</div>
+@endif
+
+@if(session('error') || $errors->any())
 <div class="mb-5 flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
     <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>
     <div>
+        @if(session('error'))
+            <p class="text-sm text-red-700 dark:text-red-400">{{ session('error') }}</p>
+        @endif
         @foreach($errors->all() as $error)
             <p class="text-sm text-red-700 dark:text-red-400">{{ $error }}</p>
         @endforeach

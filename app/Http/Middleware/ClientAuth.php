@@ -13,6 +13,10 @@ class ClientAuth
     public function handle(Request $request, Closure $next): Response
     {
         if (session()->has('clientId')) {
+            if ($this->isSuspended((int) session('clientId'))) {
+                return $this->rejectSuspended($request);
+            }
+
             $this->ensureCurrencyDefault();
             return $next($request);
         }
@@ -23,6 +27,10 @@ class ClientAuth
             $client = Client::find((int) $rememberedId);
 
             if ($client) {
+                if ($client->isSuspended()) {
+                    return $this->rejectSuspended($request);
+                }
+
                 session([
                     'clientId'  => $client->id,
                     'firstName' => $client->firstname,
@@ -35,6 +43,24 @@ class ClientAuth
         }
 
         return redirect()->route('login')->with('error', 'Your session has expired. Please log in again.');
+    }
+
+    /**
+     * Checked on every request (not just at login) so suspending a client cuts off
+     * an already-active session immediately, rather than only blocking future logins.
+     */
+    private function isSuspended(int $clientId): bool
+    {
+        return Client::where('id', $clientId)->whereNotNull('suspended_at')->exists();
+    }
+
+    private function rejectSuspended(Request $request): Response
+    {
+        session()->flush();
+
+        return redirect()->route('login')
+            ->withCookie(cookie()->forget('kloud101_remember'))
+            ->with('error', 'This account has been suspended. Contact support for assistance.');
     }
 
     /**

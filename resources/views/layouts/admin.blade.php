@@ -82,7 +82,7 @@
     <div class="flex h-screen overflow-hidden">
 
         {{-- Mobile sidebar overlay --}}
-        <div x-show="sidebarOpen && window.innerWidth < 1024"
+        <div x-show="sidebarOpen && !isDesktop"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
@@ -139,6 +139,28 @@
                               d="M9 7h6m0 10v-3m-3 3v-6m-3 6v-9m-2 9h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v9a2 2 0 002 2z"/>
                     </svg>
                     Pricing
+                </a>
+                @endif
+
+                @if($role?->canManageTickets())
+                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Support</p>
+
+                <a href="{{ route('admin.tickets.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.tickets.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    Support Tickets
+                </a>
+
+                <a href="{{ route('admin.clients.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.clients.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 100-8"/>
+                    </svg>
+                    Clients
                 </a>
                 @endif
 

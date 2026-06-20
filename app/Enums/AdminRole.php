@@ -37,4 +37,9 @@ enum AdminRole: string
     {
         return in_array($this, [self::SuperAdmin, self::FinanceManager], true);
     }
+
+    public function canManageTickets(): bool
+    {
+        return in_array($this, [self::SuperAdmin, self::SupportAgent], true);
+    }
 }

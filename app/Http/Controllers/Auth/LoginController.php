@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\LoginAlertMail;
 use App\Models\Client;
+use App\Services\IpLocationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class LoginController extends Controller
@@ -30,6 +33,12 @@ class LoginController extends Controller
                 ->withErrors(['email' => 'Invalid email or password.']);
         }
 
+        if ($client->isSuspended()) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'This account has been suspended. Contact support for assistance.']);
+        }
+
         session()->regenerate();
         session([
             'clientId'  => $client->id,
@@ -37,6 +46,13 @@ class LoginController extends Controller
             'lastName'  => $client->lastname,
             'email'     => $client->email,
         ]);
+
+        Mail::to($client->email)->send(new LoginAlertMail(
+            firstName: $client->firstname,
+            ip: $request->ip(),
+            location: app(IpLocationService::class)->locate($request->ip()),
+            loggedInAt: now()->format('M j, Y \a\t g:i A'),
+        ));
 
         $response = redirect()->intended(route('dashboard'));
 

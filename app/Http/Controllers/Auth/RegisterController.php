@@ -50,6 +50,8 @@ class RegisterController extends Controller
 
         $this->createShadowWhmcsClient($client, $request->password);
 
+        EmailVerificationController::send($client);
+
         session()->regenerate();
         session([
             'clientId'  => $client->id,

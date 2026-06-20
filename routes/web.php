@@ -2,9 +2,12 @@
 
 use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminClientController;
 use App\Http\Controllers\Admin\AdminPricingController;
+use App\Http\Controllers\Admin\AdminTicketController;
 use App\Http\Controllers\Admin\AdminTwoFactorController;
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -60,12 +63,22 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
 
+// Reachable whether or not the client has an active session on this device/browser
+// (same as a password reset link) — authorization comes entirely from the signature.
+Route::get('/verify-email/{id}', [EmailVerificationController::class, 'verify'])
+    ->middleware('signed')
+    ->name('verification.verify');
+
 // -------------------------------------------------------------------------
 // Dashboard (protected by ClientAuth middleware)
 // -------------------------------------------------------------------------
 Route::middleware('client.auth')->group(function () {
 
     Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard');
+
+    Route::post('/verify-email/resend', [EmailVerificationController::class, 'resend'])
+        ->name('verification.resend')
+        ->middleware('throttle:6,1');
 
     // Servers
     Route::get('/servers',              [ServerController::class, 'index'])->name('servers.index');
@@ -194,6 +207,23 @@ Route::prefix('admin')->group(function () {
         Route::middleware('admin.role:super_admin,finance_manager')->group(function () {
             Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
             Route::post('/pricing', [AdminPricingController::class, 'update'])->name('admin.pricing.update');
+        });
+
+        Route::middleware('admin.role:super_admin,support_agent')->prefix('tickets')->group(function () {
+            Route::get('/',             [AdminTicketController::class, 'index'])->name('admin.tickets.index');
+            Route::get('/{id}',         [AdminTicketController::class, 'show'])->name('admin.tickets.show');
+            Route::post('/{id}/reply',  [AdminTicketController::class, 'reply'])->name('admin.tickets.reply');
+            Route::post('/{id}/close',  [AdminTicketController::class, 'close'])->name('admin.tickets.close');
+        });
+
+        Route::middleware('admin.role:super_admin,support_agent')->prefix('clients')->group(function () {
+            Route::get('/',                       [AdminClientController::class, 'index'])->name('admin.clients.index');
+            Route::get('/{client}',               [AdminClientController::class, 'show'])->name('admin.clients.show');
+            Route::put('/{client}',                [AdminClientController::class, 'update'])->name('admin.clients.update');
+            Route::post('/{client}/suspend',       [AdminClientController::class, 'suspend'])->name('admin.clients.suspend');
+            Route::post('/{client}/unsuspend',     [AdminClientController::class, 'unsuspend'])->name('admin.clients.unsuspend');
+            Route::post('/{client}/reset-password', [AdminClientController::class, 'resetPassword'])->name('admin.clients.reset-password');
+            Route::post('/{client}/resend-verification', [AdminClientController::class, 'resendVerification'])->name('admin.clients.resend-verification');
         });
 
         // Admin account + role management — restricted to Super Admin so no other
