@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin') — Kloud101</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="/images/icon-192.png" sizes="192x192">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     {{-- Anti-FOUC: apply dark class before page renders --}}
     <script>
@@ -103,14 +106,13 @@
 
             {{-- Logo --}}
             <div class="flex items-center gap-3 px-5 py-4 border-b border-slate-200 dark:border-white/[0.06] flex-shrink-0">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center shadow-lg shadow-indigo-500/30 p-1.5">
+                    <img src="/images/kloud101-icon.png" alt="Kloud101" class="w-full h-full object-contain">
                 </div>
                 <div>
-                    <div class="text-base font-bold text-slate-900 dark:text-white leading-none">Kloud101</div>
+                    <div class="text-base font-bold leading-none">
+                        <span class="text-slate-900 dark:text-white">kloud</span><span class="text-blue-600 dark:text-blue-400">101</span>
+                    </div>
                     <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Admin</div>
                 </div>
             </div>

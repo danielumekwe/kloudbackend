@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Welcome') — Kloud101</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="/images/icon-192.png" sizes="192x192">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     {{-- Anti-FOUC --}}
     <script>
@@ -55,13 +58,12 @@
             {{-- Logo --}}
             <div class="text-center mb-8">
                 <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl
-                            bg-gradient-to-br from-blue-500 to-blue-700 shadow-xl shadow-blue-500/30 mb-4">
-                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
-                    </svg>
+                            bg-gradient-to-br from-blue-500 to-blue-700 shadow-xl shadow-blue-500/30 mb-4 p-2.5">
+                    <img src="/images/kloud101-icon.png" alt="Kloud101" class="w-full h-full object-contain">
                 </div>
-                <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Kloud101</h1>
+                <h1 class="text-2xl font-bold">
+                    <span class="text-slate-900 dark:text-white">kloud</span><span class="text-blue-600 dark:text-blue-400">101</span>
+                </h1>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Client Portal</p>
             </div>
 
