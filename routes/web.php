@@ -83,7 +83,6 @@ Route::middleware('client.auth')->group(function () {
     // Servers
     Route::get('/servers',              [ServerController::class, 'index'])->name('servers.index');
     Route::get('/servers/order',        [ProductController::class, 'index'])->name('servers.order');
-    Route::post('/servers/order',       [ProductController::class, 'store'])->name('servers.order.store');
     Route::get('/servers/{id}',         [ServerController::class, 'show'])->name('servers.show');
     Route::post('/servers/{id}/action', [ServerController::class, 'action'])->name('servers.action');
 

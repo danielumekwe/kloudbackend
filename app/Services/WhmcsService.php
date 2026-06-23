@@ -145,20 +145,6 @@ class WhmcsService
         return $this->normalizeList($response['products']['product'] ?? []);
     }
 
-    public function addOrder(array $data): array
-    {
-        return $this->call('AddOrder', $data);
-    }
-
-    public function getPaymentMethods(): array
-    {
-        $response = $this->call('GetPaymentMethods');
-        if ($response['result'] !== 'success') {
-            return [];
-        }
-        return $this->normalizeList($response['paymentmethods']['paymentmethod'] ?? []);
-    }
-
     public function getOrders(int $clientId): array
     {
         $response = $this->call('GetOrders', ['clientid' => $clientId]);
