@@ -23,7 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // own signature scheme instead (see WebhookController).
         $middleware->validateCsrfTokens(except: [
             'webhooks/*',
+            'api/*',
         ]);
+
+        // Apply CORS headers to all /api/* responses so the Next.js marketing
+        // site at kloud101.com can call these endpoints cross-origin.
+        $middleware->prependToGroup('web', \Illuminate\Http\Middleware\HandleCors::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

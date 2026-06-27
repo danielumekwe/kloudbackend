@@ -1,10 +1,17 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminAuthController;
+use App\Http\Controllers\Api\LegalDocumentController;
+use App\Http\Controllers\Admin\AdminBillingSettingsController;
+use App\Http\Controllers\Admin\AdminCommunicationsController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminClientController;
+use App\Http\Controllers\Admin\AdminInvoicesController;
+use App\Http\Controllers\Admin\AdminOrdersController;
 use App\Http\Controllers\Admin\AdminPricingController;
+use App\Http\Controllers\Admin\AdminServicesController;
 use App\Http\Controllers\Admin\AdminTicketController;
+use App\Http\Controllers\Admin\AdminTransactionsController;
 use App\Http\Controllers\Admin\AdminTwoFactorController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Auth\EmailVerificationController;
@@ -27,6 +34,15 @@ use App\Http\Controllers\Dashboard\SupportController;
 use App\Http\Controllers\Dashboard\VpsController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
+
+// -------------------------------------------------------------------------
+// Public JSON API — consumed by kloud101.com (Next.js marketing site).
+// No CSRF; no session; no auth required for public document reads.
+// -------------------------------------------------------------------------
+Route::prefix('api')->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])->group(function () {
+    Route::get('/legal',        [LegalDocumentController::class, 'index']);
+    Route::get('/legal/{slug}', [LegalDocumentController::class, 'show']);
+});
 
 // Root → redirect to dashboard or login
 Route::get('/', fn () => redirect()->route('dashboard'));
@@ -203,9 +219,56 @@ Route::prefix('admin')->group(function () {
         Route::post('/security/two-factor/disable', [AdminTwoFactorController::class, 'disable'])->name('admin.security.two-factor.disable');
         Route::post('/security/two-factor/recovery-codes', [AdminTwoFactorController::class, 'regenerateRecoveryCodes'])->name('admin.security.two-factor.recovery-codes');
 
+        Route::get('/orders', [AdminOrdersController::class, 'index'])->name('admin.orders.index');
+
+        // Services management (live InterServer actions)
+        Route::prefix('services')->group(function () {
+            Route::get('/', [AdminServicesController::class, 'index'])->name('admin.services.index');
+
+            Route::prefix('vps')->group(function () {
+                Route::get('/{order}',             [AdminServicesController::class, 'showVps'])->name('admin.services.vps.show');
+                Route::post('/{order}/start',      [AdminServicesController::class, 'vpsStart'])->name('admin.services.vps.start');
+                Route::post('/{order}/suspend',    [AdminServicesController::class, 'vpsSuspend'])->name('admin.services.vps.suspend');
+                Route::post('/{order}/unsuspend',  [AdminServicesController::class, 'vpsUnsuspend'])->name('admin.services.vps.unsuspend');
+                Route::post('/{order}/restart',    [AdminServicesController::class, 'vpsRestart'])->name('admin.services.vps.restart');
+                Route::post('/{order}/password',   [AdminServicesController::class, 'vpsChangePassword'])->name('admin.services.vps.change-password');
+                Route::post('/{order}/reinstall',  [AdminServicesController::class, 'vpsReinstallOs'])->name('admin.services.vps.reinstall-os');
+                Route::post('/{order}/console',    [AdminServicesController::class, 'vpsConsole'])->name('admin.services.vps.console');
+                Route::post('/{order}/cancel',     [AdminServicesController::class, 'vpsCancel'])->name('admin.services.vps.cancel');
+            });
+
+            Route::prefix('qs')->group(function () {
+                Route::get('/{order}',             [AdminServicesController::class, 'showQs'])->name('admin.services.qs.show');
+                Route::post('/{order}/start',      [AdminServicesController::class, 'qsStart'])->name('admin.services.qs.start');
+                Route::post('/{order}/suspend',    [AdminServicesController::class, 'qsSuspend'])->name('admin.services.qs.suspend');
+                Route::post('/{order}/unsuspend',  [AdminServicesController::class, 'qsUnsuspend'])->name('admin.services.qs.unsuspend');
+                Route::post('/{order}/restart',    [AdminServicesController::class, 'qsRestart'])->name('admin.services.qs.restart');
+                Route::post('/{order}/password',   [AdminServicesController::class, 'qsChangePassword'])->name('admin.services.qs.change-password');
+                Route::post('/{order}/reinstall',  [AdminServicesController::class, 'qsReinstallOs'])->name('admin.services.qs.reinstall-os');
+                Route::post('/{order}/console',    [AdminServicesController::class, 'qsConsole'])->name('admin.services.qs.console');
+                Route::post('/{order}/cancel',     [AdminServicesController::class, 'qsCancel'])->name('admin.services.qs.cancel');
+            });
+        });
+
+        // Communications
+        Route::get('/communications/newsletter',       [AdminCommunicationsController::class, 'newsletter'])->name('admin.communications.newsletter');
+        Route::post('/communications/newsletter/send', [AdminCommunicationsController::class, 'sendNewsletter'])->name('admin.communications.newsletter.send');
+
         Route::middleware('admin.role:super_admin,finance_manager')->group(function () {
             Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
             Route::post('/pricing', [AdminPricingController::class, 'update'])->name('admin.pricing.update');
+
+            Route::get('/billing-settings',  [AdminBillingSettingsController::class, 'index'])->name('admin.billing-settings');
+            Route::post('/billing-settings', [AdminBillingSettingsController::class, 'update'])->name('admin.billing-settings.update');
+
+            Route::prefix('invoices')->group(function () {
+                Route::get('/',                    [AdminInvoicesController::class, 'index'])->name('admin.invoices.index');
+                Route::get('/{id}',                [AdminInvoicesController::class, 'show'])->name('admin.invoices.show');
+                Route::post('/{id}/mark-paid',     [AdminInvoicesController::class, 'markPaid'])->name('admin.invoices.mark-paid');
+                Route::post('/{id}/cancel',        [AdminInvoicesController::class, 'cancel'])->name('admin.invoices.cancel');
+            });
+
+            Route::get('/transactions', [AdminTransactionsController::class, 'index'])->name('admin.transactions.index');
         });
 
         Route::middleware('admin.role:super_admin,support_agent')->prefix('tickets')->group(function () {
@@ -223,6 +286,8 @@ Route::prefix('admin')->group(function () {
             Route::post('/{client}/unsuspend',     [AdminClientController::class, 'unsuspend'])->name('admin.clients.unsuspend');
             Route::post('/{client}/reset-password', [AdminClientController::class, 'resetPassword'])->name('admin.clients.reset-password');
             Route::post('/{client}/resend-verification', [AdminClientController::class, 'resendVerification'])->name('admin.clients.resend-verification');
+            Route::post('/{client}/add-credit',          [AdminClientController::class, 'addCredit'])->name('admin.clients.add-credit');
+            Route::post('/{client}/send-email',          [AdminClientController::class, 'sendEmail'])->name('admin.clients.send-email');
         });
 
         // Admin account + role management — restricted to Super Admin so no other
