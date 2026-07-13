@@ -8,7 +8,7 @@ class DomainOrder extends Model
 {
     protected $fillable = [
         'client_id',
-        'whmcs_invoice_id',
+        'invoice_id',
         'interserver_domain_id',
         'domain_name',
         'tld',
@@ -32,5 +32,15 @@ class DomainOrder extends Model
     public function renewals()
     {
         return $this->hasMany(DomainRenewal::class);
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
+    }
+
+    public function invoice()
+    {
+        return $this->belongsTo(Invoice::class);
     }
 }

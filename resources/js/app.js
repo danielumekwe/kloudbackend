@@ -40,6 +40,26 @@ document.addEventListener('alpine:init', () => {
 });
 
 // -----------------------------------------------------------------------
+// Strong password generator (used by VPS/Quick Server order + password forms)
+// -----------------------------------------------------------------------
+window.generateStrongPassword = function (length = 16) {
+    const lower = 'abcdefghijklmnopqrstuvwxyz';
+    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()-_=+';
+    const all = lower + upper + numbers + symbols;
+
+    const pick = (chars) => chars[Math.floor(Math.random() * chars.length)];
+
+    const required = [pick(lower), pick(upper), pick(numbers), pick(symbols)];
+    const rest = Array.from({ length: Math.max(0, length - required.length) }, () => pick(all));
+
+    return required.concat(rest)
+        .sort(() => Math.random() - 0.5)
+        .join('');
+};
+
+// -----------------------------------------------------------------------
 // Alpine.js component: main layout (sidebar + dark mode)
 // -----------------------------------------------------------------------
 window.appLayout = function () {

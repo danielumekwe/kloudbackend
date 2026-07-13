@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Invoice;
 use App\Models\PaymentTransaction;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
@@ -14,8 +15,6 @@ use Illuminate\Support\Facades\Log;
  */
 class PaymentService
 {
-    public function __construct(private WhmcsService $whmcs) {}
-
     public function recordPayment(
         int $invoiceId,
         int $clientId,
@@ -25,37 +24,34 @@ class PaymentService
         string $currency,
         array $rawPayload = [],
     ): array {
-        $invoice = $this->whmcs->getInvoice($invoiceId);
+        $invoice = Invoice::find($invoiceId);
 
-        if (empty($invoice) || ($invoice['result'] ?? null) === 'error') {
-            Log::error('PaymentService: could not fetch invoice before recording payment', [
+        if (! $invoice) {
+            Log::error('PaymentService: invoice not found before recording payment', [
                 'invoice_id' => $invoiceId, 'gateway' => $gateway, 'reference' => $reference,
             ]);
             return ['success' => false, 'message' => 'Could not verify the invoice.'];
         }
 
         // Already paid — most likely a duplicate webhook/client-verify race, not a real error.
-        if (strtolower($invoice['status'] ?? '') === 'paid') {
+        if ($invoice->status === 'paid') {
             return ['success' => true, 'message' => 'Invoice already paid.', 'duplicate' => true];
         }
 
-        $invoiceCurrency = $invoice['currencycode'] ?? 'USD';
-        $amountDue = (float) ($invoice['balance'] ?? $invoice['total'] ?? 0);
-
-        if (strcasecmp($currency, $invoiceCurrency) !== 0) {
+        if (strcasecmp($currency, $invoice->currency_code) !== 0) {
             Log::error('PaymentService: currency mismatch, refusing to record payment', [
                 'invoice_id' => $invoiceId, 'gateway' => $gateway, 'reference' => $reference,
-                'paid_currency' => $currency, 'invoice_currency' => $invoiceCurrency,
+                'paid_currency' => $currency, 'invoice_currency' => $invoice->currency_code,
             ]);
             return ['success' => false, 'message' => 'Currency mismatch — payment not recorded.'];
         }
 
         // Small tolerance for rounding, but never silently accept a materially short
         // payment as if it covered the full amount due.
-        if ($amount < $amountDue - 0.01) {
+        if ($amount < (float) $invoice->total - 0.01) {
             Log::error('PaymentService: amount paid is less than amount due, refusing to record payment', [
                 'invoice_id' => $invoiceId, 'gateway' => $gateway, 'reference' => $reference,
-                'amount_paid' => $amount, 'amount_due' => $amountDue,
+                'amount_paid' => $amount, 'amount_due' => $invoice->total,
             ]);
             return ['success' => false, 'message' => 'Paid amount does not match the amount due.'];
         }
@@ -65,9 +61,9 @@ class PaymentService
         }
 
         try {
-            $transaction = PaymentTransaction::create([
+            PaymentTransaction::create([
                 'client_id'         => $clientId,
-                'whmcs_invoice_id'  => $invoiceId,
+                'invoice_id'        => $invoiceId,
                 'gateway'           => $gateway,
                 'gateway_reference' => $reference,
                 'amount'            => $amount,
@@ -81,15 +77,11 @@ class PaymentService
             return ['success' => true, 'message' => 'Payment already recorded.', 'duplicate' => true];
         }
 
-        $result = $this->whmcs->addInvoicePayment($invoiceId, $reference, $amount, $gateway);
-
-        if (($result['result'] ?? '') !== 'success') {
-            Log::error('PaymentService: WHMCS AddInvoicePayment failed after recording transaction', [
-                'invoice_id' => $invoiceId, 'gateway' => $gateway, 'reference' => $reference, 'result' => $result,
-            ]);
-            $transaction->update(['status' => 'failed']);
-            return ['success' => false, 'message' => 'Payment received but could not be recorded on the invoice. Please contact support.'];
-        }
+        $invoice->update([
+            'status'         => 'paid',
+            'paid_at'        => now(),
+            'payment_method' => $gateway,
+        ]);
 
         return ['success' => true, 'message' => 'Payment recorded.'];
     }

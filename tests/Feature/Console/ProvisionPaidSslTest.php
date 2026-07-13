@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Console;
 
+use App\Models\Invoice;
 use App\Models\SslOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
@@ -12,11 +13,19 @@ class ProvisionPaidSslTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeOrder(array $configOverrides = []): SslOrder
+    private function makeInvoice(string $status = 'paid'): Invoice
+    {
+        return Invoice::create([
+            'client_id' => 7, 'status' => $status, 'currency_code' => 'USD',
+            'subtotal' => 12.00, 'total' => 12.00,
+        ]);
+    }
+
+    private function makeOrder(Invoice $invoice, array $configOverrides = []): SslOrder
     {
         return SslOrder::create([
             'client_id' => 7,
-            'whmcs_invoice_id' => 42,
+            'invoice_id' => $invoice->id,
             'status' => 'pending_payment',
             'price' => 12.00,
             'billing_cycle' => 'annually',
@@ -31,12 +40,9 @@ class ProvisionPaidSslTest extends TestCase
         ]);
     }
 
-    private function fakeApis(string $invoiceStatus, array $placeOrderResponse): void
+    private function fakeApi(array $placeOrderResponse): void
     {
-        Http::fake(function (ClientRequest $request) use ($invoiceStatus, $placeOrderResponse) {
-            if (str_contains($request->url(), 'includes/api.php')) {
-                return Http::response(['result' => 'success', 'status' => $invoiceStatus]);
-            }
+        Http::fake(function (ClientRequest $request) use ($placeOrderResponse) {
             if (str_contains($request->url(), '/ssl/order')) {
                 return Http::response($placeOrderResponse);
             }
@@ -46,8 +52,9 @@ class ProvisionPaidSslTest extends TestCase
 
     public function test_skips_orders_whose_invoice_is_not_paid(): void
     {
-        $order = $this->makeOrder();
-        $this->fakeApis('Unpaid', ['success' => true, 'serviceid' => 333]);
+        $invoice = $this->makeInvoice('unpaid');
+        $order = $this->makeOrder($invoice);
+        $this->fakeApi(['success' => true, 'serviceid' => 333]);
 
         $this->artisan('ssl:provision-paid')->assertExitCode(0);
 
@@ -58,8 +65,9 @@ class ProvisionPaidSslTest extends TestCase
 
     public function test_provisions_paid_order(): void
     {
-        $order = $this->makeOrder();
-        $this->fakeApis('Paid', ['success' => true, 'serviceid' => 333]);
+        $invoice = $this->makeInvoice('paid');
+        $order = $this->makeOrder($invoice);
+        $this->fakeApi(['success' => true, 'serviceid' => 333]);
 
         $this->artisan('ssl:provision-paid')->assertExitCode(0);
 
@@ -78,8 +86,9 @@ class ProvisionPaidSslTest extends TestCase
 
     public function test_marks_order_failed_when_interserver_rejects_it(): void
     {
-        $order = $this->makeOrder();
-        $this->fakeApis('Paid', ['success' => false, 'message' => 'Invalid CSR']);
+        $invoice = $this->makeInvoice('paid');
+        $order = $this->makeOrder($invoice);
+        $this->fakeApi(['success' => false, 'message' => 'Invalid CSR']);
 
         $this->artisan('ssl:provision-paid')->assertExitCode(0);
 
@@ -90,9 +99,10 @@ class ProvisionPaidSslTest extends TestCase
 
     public function test_does_not_retry_an_order_stuck_provisioning_from_a_crashed_run(): void
     {
-        $order = $this->makeOrder();
+        $invoice = $this->makeInvoice('paid');
+        $order = $this->makeOrder($invoice);
         $order->update(['status' => 'provisioning']);
-        $this->fakeApis('Paid', ['success' => true, 'serviceid' => 333]);
+        $this->fakeApi(['success' => true, 'serviceid' => 333]);
 
         $this->artisan('ssl:provision-paid')->assertExitCode(0);
 

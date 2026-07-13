@@ -98,6 +98,46 @@
 }
 
 /* -----------------------------------------------------------------------
+   Selection cards (location, OS template, billing cycle, marketplace)
+   Using CSS instead of Tailwind dark: utilities so arbitrary opacity
+   values don't get missed by the v4 scanner in Alpine.js ternaries.
+------------------------------------------------------------------------ */
+.sel-card {
+    background-color: white;
+    border-color: theme(colors.slate.200);
+    color: theme(colors.slate.900);
+    transition: border-color 150ms, background-color 150ms;
+}
+.sel-card:hover:not(:disabled) {
+    border-color: theme(colors.blue.300);
+}
+.sel-card.is-selected {
+    border-color: theme(colors.blue.500);
+    background-color: theme(colors.blue.50);
+}
+.dark .sel-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+.dark .sel-card:hover:not(:disabled) {
+    border-color: rgba(59, 130, 246, 0.4);
+    background-color: rgba(255, 255, 255, 0.07);
+}
+.dark .sel-card.is-selected {
+    border-color: rgb(59, 130, 246);
+    background-color: rgba(59, 130, 246, 0.15);
+    color: white;
+}
+
+/* Plan table row selection */
+.plan-row { transition: background-color 150ms; }
+.plan-row:hover { background-color: theme(colors.slate.50); cursor: pointer; }
+.plan-row.is-selected { background-color: theme(colors.blue.50); }
+.dark .plan-row:hover { background-color: rgba(255, 255, 255, 0.03); }
+.dark .plan-row.is-selected { background-color: rgba(59, 130, 246, 0.15); }
+
+/* -----------------------------------------------------------------------
    Form inputs
 ------------------------------------------------------------------------ */
 .form-input {
@@ -274,7 +314,7 @@ td {
     border-bottom: 1px solid theme(colors.slate.100);
 }
 .dark td {
-    color: theme(colors.slate.300);
+    color: theme(colors.slate.200);
     border-color: rgba(255,255,255,0.04);
 }
 

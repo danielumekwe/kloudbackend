@@ -6,8 +6,7 @@
 <div class="max-w-6xl mx-auto -mt-px">
 <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-1">Dashboard</h1>
 <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">
-    Revenue and order figures are local to this app (Paystack/Flutterwave/NOWPayments payments). Invoice and ticket
-    counts come live from WHMCS.
+    Revenue, order, invoice, and ticket figures are all local to this app (Paystack/Flutterwave/NOWPayments payments).
 </p>
 
 {{-- Revenue --}}
@@ -24,8 +23,8 @@
     </div>
     <div class="card">
         <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Revenue Waiting Collection</p>
-        <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">${{ number_format($whmcsStats['revenue_waiting'], 2) }}</p>
-        <p class="text-xs text-slate-400 mt-1">Unpaid + overdue WHMCS invoices (estimate, capped at 200 each)</p>
+        <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">${{ number_format($billingStats['revenue_waiting'], 2) }}</p>
+        <p class="text-xs text-slate-400 mt-1">Total of all unpaid invoices</p>
     </div>
 </div>
 
@@ -46,7 +45,7 @@
     </div>
     <div class="card">
         <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Open Support Tickets</p>
-        <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ number_format($whmcsStats['open_tickets']) }}</p>
+        <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ number_format($billingStats['open_tickets']) }}</p>
     </div>
 </div>
 
@@ -54,15 +53,15 @@
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <div class="card">
         <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Pending Invoices</p>
-        <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ number_format($whmcsStats['pending_invoices']) }}</p>
+        <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ number_format($billingStats['pending_invoices']) }}</p>
     </div>
     <div class="card">
-        <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Overdue Invoices</p>
-        <p class="text-2xl font-bold text-red-600 dark:text-red-400">{{ number_format($whmcsStats['overdue_invoices']) }}</p>
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Cancelled Invoices</p>
+        <p class="text-2xl font-bold text-red-600 dark:text-red-400">{{ number_format($billingStats['cancelled_invoices']) }}</p>
     </div>
     <div class="card">
         <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Paid Invoices</p>
-        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ number_format($whmcsStats['paid_invoices']) }}</p>
+        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ number_format($billingStats['paid_invoices']) }}</p>
     </div>
 </div>
 

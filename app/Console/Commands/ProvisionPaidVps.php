@@ -2,27 +2,31 @@
 
 namespace App\Console\Commands;
 
+use App\Mail\VpsFailedMail;
+use App\Mail\VpsProvisionedMail;
+use App\Models\Client;
+use App\Models\Invoice;
 use App\Models\VpsOrder;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 #[Signature('vps:provision-paid')]
-#[Description('Check pending VPS orders for paid WHMCS invoices and provision them on InterServer')]
+#[Description('Check pending VPS orders for paid invoices and provision them on InterServer')]
 class ProvisionPaidVps extends Command
 {
-    public function handle(WhmcsService $whmcs, InterServerService $interserver): int
+    public function handle(InterServerService $interserver): int
     {
         $pending = VpsOrder::where('status', 'pending_payment')->get();
 
         foreach ($pending as $order) {
-            $invoice = $whmcs->getInvoice($order->whmcs_invoice_id);
+            $invoice = Invoice::find($order->invoice_id);
 
-            if (($invoice['status'] ?? '') !== 'Paid') {
+            if (! $invoice || $invoice->status !== 'paid') {
                 continue;
             }
 
@@ -43,12 +47,25 @@ class ProvisionPaidVps extends Command
                 'rootpass'     => Crypt::decryptString($config['rootpass']),
             ]);
 
+            $client  = Client::find($order->client_id);
+            $planName = $config['plan_name'] ?? ($config['platform'] ?? 'VPS');
+
             if ($result['success'] ?? false) {
                 $order->update([
                     'status'             => 'provisioned',
                     'interserver_vps_id' => $result['serviceid'],
                 ]);
                 $this->info("Provisioned VPS order #{$order->id} -> InterServer vps_id {$result['serviceid']}");
+
+                if ($client) {
+                    Mail::to($client->email)->send(new VpsProvisionedMail(
+                        firstName:  $client->firstname,
+                        hostname:   $config['hostname'] ?? 'your server',
+                        planName:   $planName,
+                        orderId:    $order->id,
+                        invoiceId:  $order->invoice_id,
+                    ));
+                }
             } else {
                 $order->update([
                     'status'         => 'failed',
@@ -56,6 +73,15 @@ class ProvisionPaidVps extends Command
                 ]);
                 Log::error("VPS auto-provision failed for order #{$order->id}", $result);
                 $this->error("Failed to provision VPS order #{$order->id}: " . ($result['message'] ?? 'unknown error'));
+
+                if ($client) {
+                    Mail::to($client->email)->send(new VpsFailedMail(
+                        firstName:  $client->firstname,
+                        planName:   $planName,
+                        orderId:    $order->id,
+                        invoiceId:  $order->invoice_id,
+                    ));
+                }
             }
         }
 

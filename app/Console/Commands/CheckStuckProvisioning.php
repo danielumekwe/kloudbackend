@@ -49,7 +49,7 @@ class CheckStuckProvisioning extends Command
                 Log::critical("{$modelClass} #{$record->id} has been stuck in \"provisioning\" for over {$minutes} minutes — likely a crashed provisioning run. Check InterServer directly before changing its status, to avoid double-provisioning.", [
                     'model' => $modelClass,
                     'id' => $record->id,
-                    'whmcs_invoice_id' => $record->whmcs_invoice_id,
+                    'invoice_id' => $record->invoice_id,
                     'updated_at' => $record->updated_at,
                 ]);
 

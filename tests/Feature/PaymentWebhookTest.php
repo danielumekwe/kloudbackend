@@ -2,9 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Invoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Request as ClientRequest;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class PaymentWebhookTest extends TestCase
@@ -22,17 +21,12 @@ class PaymentWebhookTest extends TestCase
         ]);
     }
 
-    private function fakeWhmcsInvoice(array $invoice, array $addInvoicePayment = ['result' => 'success']): void
+    private function makeInvoice(array $overrides = []): Invoice
     {
-        Http::fake(function (ClientRequest $request) use ($invoice, $addInvoicePayment) {
-            $action = $request->data()['action'] ?? null;
-
-            return match ($action) {
-                'GetInvoice' => Http::response($invoice),
-                'AddInvoicePayment' => Http::response($addInvoicePayment),
-                default => Http::response(['result' => 'error'], 404),
-            };
-        });
+        return Invoice::create(array_merge([
+            'client_id' => 7, 'status' => 'unpaid', 'currency_code' => 'NGN',
+            'subtotal' => 50.00, 'total' => 50.00,
+        ], $overrides));
     }
 
     // -------------------------------------------------------------------------
@@ -51,16 +45,16 @@ class PaymentWebhookTest extends TestCase
 
     public function test_paystack_webhook_records_payment_on_valid_signature(): void
     {
-        $this->fakeWhmcsInvoice(['result' => 'success', 'status' => 'Unpaid', 'currencycode' => 'NGN', 'balance' => '50.00']);
+        $invoice = $this->makeInvoice();
 
         $body = [
             'event' => 'charge.success',
             'data' => [
                 'status' => 'success',
-                'reference' => 'kloud101-invoice-42-abc',
+                'reference' => "kloud101-invoice-{$invoice->id}-abc",
                 'amount' => 5000, // kobo
                 'currency' => 'NGN',
-                'metadata' => ['invoice_id' => 42, 'client_id' => 7],
+                'metadata' => ['invoice_id' => $invoice->id, 'client_id' => 7],
             ],
         ];
         $payload = json_encode($body);
@@ -73,10 +67,11 @@ class PaymentWebhookTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseHas('payment_transactions', [
-            'whmcs_invoice_id' => 42,
+            'invoice_id' => $invoice->id,
             'gateway' => 'paystack',
-            'gateway_reference' => 'kloud101-invoice-42-abc',
+            'gateway_reference' => "kloud101-invoice-{$invoice->id}-abc",
         ]);
+        $this->assertSame('paid', $invoice->refresh()->status);
     }
 
     public function test_paystack_webhook_ignores_non_success_events(): void
@@ -110,24 +105,25 @@ class PaymentWebhookTest extends TestCase
 
     public function test_flutterwave_webhook_records_payment_on_valid_signature(): void
     {
-        $this->fakeWhmcsInvoice(['result' => 'success', 'status' => 'Unpaid', 'currencycode' => 'NGN', 'balance' => '50.00']);
+        $invoice = $this->makeInvoice();
 
         $response = $this->postJson('/webhooks/flutterwave', [
             'data' => [
                 'status' => 'successful',
-                'tx_ref' => 'kloud101-invoice-42-xyz',
+                'tx_ref' => "kloud101-invoice-{$invoice->id}-xyz",
                 'amount' => 50,
                 'currency' => 'NGN',
-                'meta' => ['invoice_id' => 42, 'client_id' => 7],
+                'meta' => ['invoice_id' => $invoice->id, 'client_id' => 7],
             ],
         ], ['verif-hash' => 'flutterwave-hash']);
 
         $response->assertOk();
         $this->assertDatabaseHas('payment_transactions', [
-            'whmcs_invoice_id' => 42,
+            'invoice_id' => $invoice->id,
             'gateway' => 'flutterwave',
-            'gateway_reference' => 'kloud101-invoice-42-xyz',
+            'gateway_reference' => "kloud101-invoice-{$invoice->id}-xyz",
         ]);
+        $this->assertSame('paid', $invoice->refresh()->status);
     }
 
     // -------------------------------------------------------------------------
@@ -146,11 +142,11 @@ class PaymentWebhookTest extends TestCase
 
     public function test_nowpayments_webhook_records_payment_when_finished(): void
     {
-        $this->fakeWhmcsInvoice(['result' => 'success', 'status' => 'Unpaid', 'currencycode' => 'USD', 'balance' => '20.00', 'userid' => 7]);
+        $invoice = $this->makeInvoice(['currency_code' => 'USD', 'subtotal' => 20.00, 'total' => 20.00]);
 
         $body = [
             'payment_status' => 'finished',
-            'order_id' => '42',
+            'order_id' => (string) $invoice->id,
             'payment_id' => 'np-123',
             'price_amount' => 20,
             'price_currency' => 'usd',
@@ -162,10 +158,11 @@ class PaymentWebhookTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseHas('payment_transactions', [
-            'whmcs_invoice_id' => 42,
+            'invoice_id' => $invoice->id,
             'gateway' => 'nowpayments',
             'gateway_reference' => 'np-123',
         ]);
+        $this->assertSame('paid', $invoice->refresh()->status);
     }
 
     public function test_nowpayments_webhook_ignores_unfinished_status(): void

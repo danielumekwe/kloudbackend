@@ -3,18 +3,17 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Models\Invoice;
 use App\Services\FlutterwaveService;
 use App\Services\NowPaymentsService;
 use App\Services\PaymentService;
 use App\Services\PaystackService;
-use App\Services\WhmcsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
     public function __construct(
-        private WhmcsService $whmcs,
         private PaymentService $payments,
         private PaystackService $paystack,
         private FlutterwaveService $flutterwave,
@@ -30,8 +29,8 @@ class PaymentController extends Controller
     {
         $validated = $request->validate(['reference' => ['required', 'string']]);
 
-        $invoice = $this->whmcs->getInvoice($id);
-        if (empty($invoice) || ($invoice['result'] ?? null) === 'error') {
+        $invoice = Invoice::find($id);
+        if (! $invoice) {
             return response()->json(['success' => false, 'message' => 'Invoice not found.'], 404);
         }
 
@@ -67,8 +66,8 @@ class PaymentController extends Controller
     {
         $validated = $request->validate(['transaction_id' => ['required', 'string']]);
 
-        $invoice = $this->whmcs->getInvoice($id);
-        if (empty($invoice) || ($invoice['result'] ?? null) === 'error') {
+        $invoice = Invoice::find($id);
+        if (! $invoice) {
             return response()->json(['success' => false, 'message' => 'Invoice not found.'], 404);
         }
 
@@ -105,14 +104,14 @@ class PaymentController extends Controller
      */
     public function initNowPayments(Request $request, int $id): JsonResponse
     {
-        $invoice = $this->whmcs->getInvoice($id);
-        if (empty($invoice) || ($invoice['result'] ?? null) === 'error') {
+        $invoice = Invoice::find($id);
+        if (! $invoice) {
             return response()->json(['success' => false, 'message' => 'Invoice not found.'], 404);
         }
 
         $result = $this->nowPayments->createInvoice([
-            'price_amount'      => (float) ($invoice['total'] ?? 0),
-            'price_currency'    => strtolower($invoice['currencycode'] ?? 'usd'),
+            'price_amount'      => (float) $invoice->total,
+            'price_currency'    => strtolower($invoice->currency_code),
             'order_id'          => (string) $id,
             'order_description' => "Invoice #{$id}",
             'ipn_callback_url'  => route('webhooks.nowpayments'),

@@ -4,8 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Controller;
+use App\Mail\AdminMessageMail;
 use App\Mail\PasswordResetMail;
 use App\Models\Client;
+use App\Models\DomainOrder;
+use App\Models\Invoice;
+use App\Models\QsOrder;
+use App\Models\SslOrder;
+use App\Models\VpsOrder;
 use App\Services\TicketService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,9 +48,16 @@ class AdminClientController extends Controller
 
     public function show(Client $client): View
     {
-        $tickets = $this->tickets->getTickets($client->id);
+        $tickets  = $this->tickets->getTickets($client->id);
+        $invoices = Invoice::where('client_id', $client->id)->latest()->get();
 
-        return view('admin.clients.show', compact('client', 'tickets'));
+        $vps    = VpsOrder::where('client_id', $client->id)->latest()->get()->map(fn ($o) => ['type' => 'VPS',          'desc' => $o->config['plan_name'] ?? $o->category ?? 'VPS',             'status' => $o->status, 'price' => $o->price, 'invoice_id' => $o->invoice_id, 'created_at' => $o->created_at]);
+        $qs     = QsOrder::where('client_id', $client->id)->latest()->get()->map(fn ($o) => ['type' => 'Quick Server',  'desc' => $o->config['plan_name'] ?? 'Quick Server',                     'status' => $o->status, 'price' => $o->price, 'invoice_id' => $o->invoice_id, 'created_at' => $o->created_at]);
+        $ssl    = SslOrder::where('client_id', $client->id)->latest()->get()->map(fn ($o) => ['type' => 'SSL',          'desc' => $o->config['product_name'] ?? $o->config['domain'] ?? 'SSL',  'status' => $o->status, 'price' => $o->price, 'invoice_id' => $o->invoice_id, 'created_at' => $o->created_at]);
+        $domain = DomainOrder::where('client_id', $client->id)->latest()->get()->map(fn ($o) => ['type' => 'Domain',   'desc' => $o->domain_name . '.' . $o->tld,                              'status' => $o->status, 'price' => $o->price, 'invoice_id' => $o->invoice_id, 'created_at' => $o->created_at]);
+        $orders = $vps->concat($qs)->concat($ssl)->concat($domain)->sortByDesc('created_at')->values();
+
+        return view('admin.clients.show', compact('client', 'tickets', 'invoices', 'orders'));
     }
 
     public function update(Request $request, Client $client): RedirectResponse
@@ -110,5 +123,36 @@ class AdminClientController extends Controller
         EmailVerificationController::send($client);
 
         return redirect()->route('admin.clients.show', $client)->with('success', 'Verification email re-sent to ' . $client->email . '.');
+    }
+
+    public function addCredit(Request $request, Client $client): RedirectResponse
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:10000'],
+            'note'   => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $client->increment('credit_balance', $validated['amount']);
+
+        return redirect()->route('admin.clients.show', $client)
+            ->with('success', sprintf('Added $%.2f credit to %s %s. New balance: $%.2f.',
+                $validated['amount'], $client->firstname, $client->lastname, (float) $client->fresh()->credit_balance));
+    }
+
+    public function sendEmail(Request $request, Client $client): RedirectResponse
+    {
+        $validated = $request->validate([
+            'subject' => ['required', 'string', 'max:200'],
+            'body'    => ['required', 'string', 'max:5000'],
+        ]);
+
+        Mail::to($client->email)->send(new AdminMessageMail(
+            firstName: $client->firstname,
+            subject:   $validated['subject'],
+            body:      $validated['body'],
+        ));
+
+        return redirect()->route('admin.clients.show', $client)
+            ->with('success', 'Email sent to ' . $client->email . '.');
     }
 }

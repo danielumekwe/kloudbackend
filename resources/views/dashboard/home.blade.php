@@ -164,7 +164,7 @@
                 <h3 class="font-semibold text-slate-900 dark:text-white">Recent Invoices</h3>
                 <a href="{{ route('billing.index') }}" class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">View all</a>
             </div>
-            @if(empty($recentInvoices))
+            @if($recentInvoices->isEmpty())
                 <div class="px-5 py-10 text-center">
                     <svg class="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -175,19 +175,18 @@
                 <ul class="divide-y divide-slate-100 dark:divide-white/[0.04]">
                     @foreach($recentInvoices as $invoice)
                     <li>
-                        <a href="{{ route('billing.show', $invoice['id']) }}"
+                        <a href="{{ route('billing.show', $invoice->id) }}"
                            class="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
                             <div>
-                                <p class="text-sm font-medium text-slate-900 dark:text-white">#{{ $invoice['id'] }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Due {{ $invoice['duedate'] ?? '' }}</p>
+                                <p class="text-sm font-medium text-slate-900 dark:text-white">#{{ $invoice->id }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ $invoice->created_at->format('M j, Y') }}</p>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-sm font-semibold text-slate-900 dark:text-white">
-                                    {{ $invoice['currencycode'] ?? '' }} {{ number_format((float)($invoice['total'] ?? 0), 2) }}
+                                    {{ $invoice->currency_code }} {{ number_format((float) $invoice->total, 2) }}
                                 </span>
-                                @php $st = strtolower($invoice['status'] ?? ''); @endphp
-                                <span class="badge badge-{{ $st === 'paid' ? 'paid' : ($st === 'unpaid' ? 'unpaid' : 'cancelled') }}">
-                                    {{ $invoice['status'] ?? '' }}
+                                <span class="badge badge-{{ $invoice->status }}">
+                                    {{ ucfirst($invoice->status) }}
                                 </span>
                             </div>
                         </a>

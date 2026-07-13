@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Client;
+use App\Models\Invoice;
 use App\Services\FlutterwaveService;
 use App\Services\NowPaymentsService;
 use App\Services\PaymentService;
 use App\Services\PaystackService;
-use App\Services\WhmcsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +25,6 @@ class WebhookController extends Controller
         private PaystackService $paystack,
         private FlutterwaveService $flutterwave,
         private NowPaymentsService $nowPayments,
-        private WhmcsService $whmcs,
     ) {}
 
     public function paystack(Request $request): JsonResponse
@@ -128,21 +126,15 @@ class WebhookController extends Controller
             return response()->json(['message' => 'Could not determine invoice'], 422);
         }
 
-        $invoice = $this->whmcs->getInvoice($invoiceId);
-        if (empty($invoice) || ($invoice['result'] ?? null) === 'error') {
+        $invoice = Invoice::find($invoiceId);
+        if (! $invoice) {
             Log::error('NOWPayments webhook: invoice not found', ['invoice_id' => $invoiceId]);
             return response()->json(['message' => 'Invoice not found'], 422);
         }
 
-        // invoice['userid'] is WHMCS's own client id, not necessarily our local one
-        // (they only coincide for clients migrated before the WHMCS exit) — resolve
-        // back to the local client via whmcs_client_id rather than storing WHMCS's
-        // id directly as payment_transactions.client_id.
-        $client = Client::where('whmcs_client_id', (int) ($invoice['userid'] ?? 0))->first();
-
         $result = $this->payments->recordPayment(
             invoiceId: $invoiceId,
-            clientId: $client?->id ?? 0,
+            clientId: $invoice->client_id,
             gateway: 'nowpayments',
             reference: (string) ($payload['payment_id'] ?? ''),
             amount: (float) ($payload['price_amount'] ?? 0),

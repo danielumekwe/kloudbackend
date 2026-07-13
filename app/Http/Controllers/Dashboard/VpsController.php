@@ -7,9 +7,10 @@ use App\Mail\OrderConfirmationMail;
 use App\Models\Client;
 use App\Models\VpsOrder;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
+use App\Services\InvoiceService;
 use App\Support\CurrencyConverter;
 use App\Support\PricingConfig;
+use App\Support\ProductCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class VpsController extends Controller
 {
     public function __construct(
         private InterServerService $interserver,
-        private WhmcsService $whmcs,
+        private InvoiceService $invoices,
     ) {}
 
     /**
@@ -97,9 +98,11 @@ class VpsController extends Controller
             $controlpanelOptions[$key]['price'] = CurrencyConverter::convertFromUsd($option['price'], $currency['code']);
         }
 
+        $pricePerSlice = ProductCatalog::vpsSlicePrice($category, 1, $currency['code'], (float) $plan['price_per_slice']);
+
         return view('dashboard.vps.catalog', compact(
             'category', 'plan', 'locations', 'stock', 'osNames', 'templates',
-            'maxSlices', 'minSlices', 'recommendedMinSlices', 'controlpanelOptions', 'periods', 'currency',
+            'maxSlices', 'minSlices', 'recommendedMinSlices', 'controlpanelOptions', 'periods', 'currency', 'pricePerSlice',
         ));
     }
 
@@ -142,8 +145,7 @@ class VpsController extends Controller
             return response()->json(['error' => implode(' ', $check['errors'] ?? ['This configuration is not available.'])], 422);
         }
 
-        $priceUsd = $this->computePrice($plan, (int) $validated['slices'], (int) $validated['period'], $validated['controlpanel'] ?? null);
-        $price    = CurrencyConverter::convertFromUsd($priceUsd, session('currency', 'USD'));
+        $price = $this->computePrice($plan, (string) $validated['category'], (int) $validated['slices'], (int) $validated['period'], session('currency', 'USD'), $validated['controlpanel'] ?? null);
 
         return response()->json(['price' => $price]);
     }
@@ -191,46 +193,24 @@ class VpsController extends Controller
             return back()->withErrors(implode(' ', $check['errors'] ?? ['This configuration is not available.']))->withInput();
         }
 
-        $priceUsd = $this->computePrice($plan, (int) $validated['slices'], (int) $validated['period'], $validated['controlpanel'] ?? null);
+        $currencyCode = session('currency', 'USD');
+        $price = $this->computePrice($plan, $category, (int) $validated['slices'], (int) $validated['period'], $currencyCode, $validated['controlpanel'] ?? null);
+        $priceUsd = $this->computePriceUsd($plan, (int) $validated['slices'], (int) $validated['period'], $validated['controlpanel'] ?? null);
 
-        $currencyCode   = session('currency', 'USD');
-        $currencyRate   = CurrencyConverter::refreshFresh($currencyCode); // live rate — real money, never use the cached one here
-        $price          = round($priceUsd * $currencyRate, 2);
-
-        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
-        // whmcs_client_id, never the local id directly — they only coincide for
-        // clients migrated before the WHMCS exit (see the migration plan).
         $client = Client::find($clientId);
-        $whmcsClientId = $client?->whmcs_client_id;
-
-        if (! $whmcsClientId) {
-            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
-        }
-
-        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
-            return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
-        }
 
         $orderDescription = "{$plan['label']} — {$validated['slices']} slice(s) — {$validated['hostname']}";
 
-        $invoice = $this->whmcs->createInvoice(
-            $whmcsClientId,
-            $orderDescription,
-            $price,
-        );
-
-        if (($invoice['result'] ?? '') !== 'success') {
-            return back()->with('error', 'Could not create your invoice. Please contact support.')->withInput();
-        }
+        $invoice = $this->invoices->createAt($client, $orderDescription, $price, $currencyCode);
 
         VpsOrder::create([
-            'client_id'        => $clientId,
-            'category'         => $validated['category'],
-            'whmcs_invoice_id' => $invoice['invoiceid'],
-            'status'           => 'pending_payment',
-            'price'            => $price,
-            'billing_cycle'    => $validated['period'],
-            'config'           => [
+            'client_id'     => $clientId,
+            'category'      => $validated['category'],
+            'invoice_id'    => $invoice->id,
+            'status'        => 'pending_payment',
+            'price'         => $invoice->total,
+            'billing_cycle' => $validated['period'],
+            'config'        => [
                 'platform'     => $plan['platform'],
                 'controlpanel' => $plan['controlpanel'], // value sent to InterServer (we license panels ourselves)
                 'panelLicense' => $validated['controlpanel'] ?? null,
@@ -249,12 +229,12 @@ class VpsController extends Controller
         Mail::to($client->email)->send(new OrderConfirmationMail(
             $client->firstname,
             $orderDescription,
-            $price,
+            $invoice->total,
             $currencyCode,
-            $invoice['invoiceid'],
+            $invoice->id,
         ));
 
-        return redirect()->route('billing.show', $invoice['invoiceid'])
+        return redirect()->route('billing.show', $invoice->id)
             ->with('success', 'Your order has been created. Your VPS will be provisioned automatically as soon as this invoice is paid.');
     }
 
@@ -390,18 +370,44 @@ class VpsController extends Controller
         return ['required', 'string', 'in:' . implode(',', array_keys($options))];
     }
 
-    private function computePrice(array $plan, int $slices, int $period, ?string $controlpanel = null): float
+    /**
+     * Price in $currency, honoring any admin-set per-cycle/per-currency override on the
+     * category's slice price (see App\Support\ProductCatalog). Controlpanel add-ons are
+     * out of scope for that override matrix and always convert from their flat USD price.
+     */
+    private function computePrice(array $plan, string $category, int $slices, int $period, string $currency, ?string $controlpanel = null): float
     {
-        $monthly = $plan['price_per_slice'] * $slices;
+        $sliceTotal = ProductCatalog::vpsSlicePrice($category, $period, $currency, (float) $plan['price_per_slice']) * $slices;
 
-        if (! empty($plan['controlpanel_options'])) {
-            $monthly += $plan['controlpanel_options'][$controlpanel]['price'] ?? 0;
-        } elseif (($plan['controlpanel'] ?? 'none') !== 'none') {
-            $monthly += $plan['controlpanel_price'] ?? 0;
-        }
+        $addonUsdMonthly = $this->controlpanelAddonUsd($plan, $controlpanel);
+        $discount = PricingConfig::vpsPeriodDiscount($period);
+        $addonTotal = CurrencyConverter::convertFromUsd($addonUsdMonthly * $period * $discount, $currency);
 
+        return round($sliceTotal + $addonTotal, 2);
+    }
+
+    /**
+     * Pure USD cost basis (no override, no currency conversion) — recorded on the order's
+     * config.amount_usd for InterServer reconciliation, independent of any per-currency override.
+     */
+    private function computePriceUsd(array $plan, int $slices, int $period, ?string $controlpanel = null): float
+    {
+        $monthly = $plan['price_per_slice'] * $slices + $this->controlpanelAddonUsd($plan, $controlpanel);
         $discount = PricingConfig::vpsPeriodDiscount($period);
 
         return round($monthly * $period * $discount, 2);
+    }
+
+    private function controlpanelAddonUsd(array $plan, ?string $controlpanel): float
+    {
+        if (! empty($plan['controlpanel_options'])) {
+            return (float) ($plan['controlpanel_options'][$controlpanel]['price'] ?? 0);
+        }
+
+        if (($plan['controlpanel'] ?? 'none') !== 'none') {
+            return (float) ($plan['controlpanel_price'] ?? 0);
+        }
+
+        return 0.0;
     }
 }

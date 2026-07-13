@@ -3,6 +3,7 @@
 namespace Tests\Feature\Console;
 
 use App\Models\DomainOrder;
+use App\Models\Invoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
@@ -12,11 +13,19 @@ class ProvisionPaidDomainTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeOrder(array $overrides = []): DomainOrder
+    private function makeInvoice(string $status = 'paid'): Invoice
+    {
+        return Invoice::create([
+            'client_id' => 7, 'status' => $status, 'currency_code' => 'USD',
+            'subtotal' => 15.00, 'total' => 15.00,
+        ]);
+    }
+
+    private function makeOrder(Invoice $invoice, array $overrides = []): DomainOrder
     {
         return DomainOrder::create(array_merge([
             'client_id' => 7,
-            'whmcs_invoice_id' => 42,
+            'invoice_id' => $invoice->id,
             'domain_name' => 'example',
             'tld' => 'com',
             'order_type' => 'register',
@@ -29,12 +38,9 @@ class ProvisionPaidDomainTest extends TestCase
         ], $overrides));
     }
 
-    private function fakeApis(string $invoiceStatus, array $placeOrderResponse): void
+    private function fakeApi(array $placeOrderResponse): void
     {
-        Http::fake(function (ClientRequest $request) use ($invoiceStatus, $placeOrderResponse) {
-            if (str_contains($request->url(), 'includes/api.php')) {
-                return Http::response(['result' => 'success', 'status' => $invoiceStatus, 'currencycode' => 'USD']);
-            }
+        Http::fake(function (ClientRequest $request) use ($placeOrderResponse) {
             if (str_contains($request->url(), '/domains/order')) {
                 return Http::response($placeOrderResponse);
             }
@@ -44,8 +50,9 @@ class ProvisionPaidDomainTest extends TestCase
 
     public function test_skips_orders_whose_invoice_is_not_paid(): void
     {
-        $order = $this->makeOrder();
-        $this->fakeApis('Unpaid', ['success' => true, 'serviceid' => 999]);
+        $invoice = $this->makeInvoice('unpaid');
+        $order = $this->makeOrder($invoice);
+        $this->fakeApi(['success' => true, 'serviceid' => 999]);
 
         $this->artisan('domains:provision-paid')->assertExitCode(0);
 
@@ -56,8 +63,9 @@ class ProvisionPaidDomainTest extends TestCase
 
     public function test_provisions_paid_registration_order(): void
     {
-        $order = $this->makeOrder();
-        $this->fakeApis('Paid', ['success' => true, 'serviceid' => 999]);
+        $invoice = $this->makeInvoice('paid');
+        $order = $this->makeOrder($invoice);
+        $this->fakeApi(['success' => true, 'serviceid' => 999]);
 
         $this->artisan('domains:provision-paid')->assertExitCode(0);
 
@@ -78,11 +86,12 @@ class ProvisionPaidDomainTest extends TestCase
 
     public function test_provisions_paid_transfer_order_with_auth_code(): void
     {
-        $order = $this->makeOrder([
+        $invoice = $this->makeInvoice('paid');
+        $order = $this->makeOrder($invoice, [
             'order_type' => 'transfer',
             'config' => ['auth_code' => 'secret-auth-code', 'currency' => 'USD', 'amount_usd' => 15.00],
         ]);
-        $this->fakeApis('Paid', ['success' => true, 'serviceid' => 1000]);
+        $this->fakeApi(['success' => true, 'serviceid' => 1000]);
 
         $this->artisan('domains:provision-paid')->assertExitCode(0);
 
@@ -99,8 +108,9 @@ class ProvisionPaidDomainTest extends TestCase
 
     public function test_marks_order_failed_when_interserver_rejects_it(): void
     {
-        $order = $this->makeOrder();
-        $this->fakeApis('Paid', ['success' => false, 'message' => 'Domain already registered']);
+        $invoice = $this->makeInvoice('paid');
+        $order = $this->makeOrder($invoice);
+        $this->fakeApi(['success' => false, 'message' => 'Domain already registered']);
 
         $this->artisan('domains:provision-paid')->assertExitCode(0);
 
@@ -111,8 +121,9 @@ class ProvisionPaidDomainTest extends TestCase
 
     public function test_does_not_retry_an_order_stuck_provisioning_from_a_crashed_run(): void
     {
-        $order = $this->makeOrder(['status' => 'provisioning']);
-        $this->fakeApis('Paid', ['success' => true, 'serviceid' => 999]);
+        $invoice = $this->makeInvoice('paid');
+        $order = $this->makeOrder($invoice, ['status' => 'provisioning']);
+        $this->fakeApi(['success' => true, 'serviceid' => 999]);
 
         $this->artisan('domains:provision-paid')->assertExitCode(0);
 

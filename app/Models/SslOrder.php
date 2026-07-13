@@ -8,7 +8,7 @@ class SslOrder extends Model
 {
     protected $fillable = [
         'client_id',
-        'whmcs_invoice_id',
+        'invoice_id',
         'interserver_ssl_id',
         'status',
         'price',
@@ -21,4 +21,14 @@ class SslOrder extends Model
         'config' => 'array',
         'price'  => 'decimal:2',
     ];
+
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
+    }
+
+    public function invoice()
+    {
+        return $this->belongsTo(Invoice::class);
+    }
 }

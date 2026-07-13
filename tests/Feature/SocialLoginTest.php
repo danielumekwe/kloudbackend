@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
 use Laravel\Socialite\Facades\Socialite;
 use Mockery;
@@ -47,13 +46,9 @@ class SocialLoginTest extends TestCase
         $this->assertSame('new-person@example.com', session('social_pending')['email']);
     }
 
-    public function test_complete_registration_creates_a_local_client_and_dual_writes_to_whmcs(): void
+    public function test_complete_registration_creates_a_local_client_and_never_calls_whmcs(): void
     {
-        Http::fake(function (ClientRequest $request) {
-            return $request->data()['action'] === 'AddClient'
-                ? Http::response(['result' => 'success', 'clientid' => 777])
-                : Http::response(['result' => 'error']);
-        });
+        Http::fake();
 
         $response = $this->withSession(['social_pending' => [
             'provider' => 'google', 'email' => 'new-person@example.com', 'firstname' => 'New', 'lastname' => 'Person',
@@ -65,9 +60,10 @@ class SocialLoginTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $client = Client::where('email', 'new-person@example.com')->first();
         $this->assertNotNull($client);
-        $this->assertSame(777, $client->whmcs_client_id);
+        $this->assertNull($client->whmcs_client_id);
         $this->assertSame($client->id, session('clientId'));
         $this->assertNull(session('social_pending'));
+        Http::assertNothingSent();
     }
 
     public function test_complete_registration_without_pending_session_redirects_to_login(): void

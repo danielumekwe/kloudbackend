@@ -64,34 +64,15 @@ class ClientAuth
     }
 
     /**
-     * Every authenticated request needs a valid session('currency'). We also track
-     * session('whmcs_account_currency_id') as our cached belief of what WHMCS's
-     * tblclients.currency is currently set to — updated only when
-     * WhmcsService::switchClientCurrency() confirms success (see order controllers).
-     * Nothing else in this app mutates a client's WHMCS currency, so this cache is
-     * safe to trust without re-fetching on every request. Currency/invoicing are
-     * still WHMCS-backed (Phase 3 of the WHMCS exit), unlike client identity here.
+     * Every authenticated request needs a valid session('currency'), seeded from
+     * the configured default on first login.
      */
     private function ensureCurrencyDefault(): void
     {
-        $needsCurrency  = ! session()->has('currency');
-        $needsAccountId = ! session()->has('whmcs_account_currency_id');
-
-        if (! $needsCurrency && ! $needsAccountId) {
+        if (session()->has('currency')) {
             return;
         }
 
-        // Every client's WHMCS account currency is assumed to already be the default
-        // (true for every existing client, since this app never switched anyone's
-        // currency before this feature existed) — this avoids an unnecessary/no-op
-        // switchClientCurrency() call on a client's very first order after this ships.
-        $default = CurrencyConverter::default();
-
-        if ($needsCurrency) {
-            session(['currency' => $default['code']]);
-        }
-        if ($needsAccountId) {
-            session(['whmcs_account_currency_id' => $default['id']]);
-        }
+        session(['currency' => CurrencyConverter::default()['code']]);
     }
 }

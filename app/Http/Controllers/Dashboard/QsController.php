@@ -7,9 +7,10 @@ use App\Mail\OrderConfirmationMail;
 use App\Models\Client;
 use App\Models\QsOrder;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
+use App\Services\InvoiceService;
 use App\Support\CurrencyConverter;
 use App\Support\PricingConfig;
+use App\Support\ProductCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class QsController extends Controller
 {
     public function __construct(
         private InterServerService $interserver,
-        private WhmcsService $whmcs,
+        private InvoiceService $invoices,
     ) {}
 
     /**
@@ -70,7 +71,7 @@ class QsController extends Controller
         $prices = [];
         foreach ($servers as $serverId => $details) {
             $priceUsd = $this->computePrice($serverId, $details['cost'] ?? '0');
-            $prices[$serverId] = CurrencyConverter::convertFromUsd($priceUsd, $currencyCode);
+            $prices[$serverId] = ProductCatalog::price('qs', (string) $serverId, 1, $currencyCode, $priceUsd);
         }
 
         return view('dashboard.qs.catalog', compact('servers', 'templates', 'prices', 'currency'));
@@ -105,7 +106,7 @@ class QsController extends Controller
         }
 
         $priceUsd = $this->computePrice($validated['server'], $servers[$validated['server']]['cost'] ?? '0');
-        $price    = CurrencyConverter::convertFromUsd($priceUsd, session('currency', 'USD'));
+        $price    = ProductCatalog::price('qs', (string) $validated['server'], 1, session('currency', 'USD'), $priceUsd);
 
         return response()->json(['price' => $price]);
     }
@@ -148,42 +149,20 @@ class QsController extends Controller
         $label    = $servers[$validated['server']]['cpu'] ?? "Quick Server #{$validated['server']}";
 
         $currencyCode = session('currency', 'USD');
-        $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
-        $price        = round($priceUsd * $currencyRate, 2);
-
-        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
-        // whmcs_client_id, never the local id directly — they only coincide for
-        // clients migrated before the WHMCS exit (see the migration plan).
+        $price = ProductCatalog::price('qs', (string) $validated['server'], 1, $currencyCode, $priceUsd);
         $client = Client::find($clientId);
-        $whmcsClientId = $client?->whmcs_client_id;
-
-        if (! $whmcsClientId) {
-            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
-        }
-
-        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
-            return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
-        }
 
         $orderDescription = "Quick Server — {$label}";
 
-        $invoice = $this->whmcs->createInvoice(
-            $whmcsClientId,
-            $orderDescription,
-            $price,
-        );
-
-        if (($invoice['result'] ?? '') !== 'success') {
-            return back()->with('error', 'Could not create your invoice. Please contact support.')->withInput();
-        }
+        $invoice = $this->invoices->createAt($client, $orderDescription, $price, $currencyCode);
 
         QsOrder::create([
-            'client_id'        => $clientId,
-            'whmcs_invoice_id' => $invoice['invoiceid'],
-            'status'           => 'pending_payment',
-            'price'            => $price,
-            'billing_cycle'    => 1,
-            'config'           => [
+            'client_id'     => $clientId,
+            'invoice_id'    => $invoice->id,
+            'status'        => 'pending_payment',
+            'price'         => $invoice->total,
+            'billing_cycle' => 1,
+            'config'        => [
                 'server'     => $validated['server'],
                 'os'         => $validated['os'],
                 'comment'    => $validated['comment'] ?? '',
@@ -196,12 +175,12 @@ class QsController extends Controller
         Mail::to($client->email)->send(new OrderConfirmationMail(
             $client->firstname,
             $orderDescription,
-            $price,
+            $invoice->total,
             $currencyCode,
-            $invoice['invoiceid'],
+            $invoice->id,
         ));
 
-        return redirect()->route('billing.show', $invoice['invoiceid'])
+        return redirect()->route('billing.show', $invoice->id)
             ->with('success', 'Your order has been created. Your Quick Server will be provisioned automatically as soon as this invoice is paid.');
     }
 

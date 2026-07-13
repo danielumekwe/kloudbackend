@@ -4,19 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DomainOrder;
+use App\Models\Invoice;
 use App\Models\PaymentTransaction;
 use App\Models\QsOrder;
 use App\Models\SslOrder;
 use App\Models\VpsOrder;
 use App\Services\TicketService;
-use App\Services\WhmcsService;
 use App\Support\CurrencyConverter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class AdminDashboardController extends Controller
 {
-    public function __construct(private WhmcsService $whmcs, private TicketService $tickets) {}
+    public function __construct(private TicketService $tickets) {}
 
     public function index(): View
     {
@@ -31,31 +31,26 @@ class AdminDashboardController extends Controller
                 + DomainOrder::where('status', 'pending_payment')->count(),
         ];
 
-        // WHMCS round-trips are the expensive part of this page — cached briefly so
-        // refreshing the dashboard doesn't hammer the WHMCS API on every load. Tickets
-        // are local now (Phase 1 of the WHMCS exit) so they're read fresh, uncached.
-        $whmcsStats = Cache::remember('admin.dashboard.whmcs_stats', now()->addMinutes(2), function () {
-            $outstanding = $this->whmcs->getOutstandingInvoices();
+        // Cached briefly so refreshing the dashboard doesn't re-run these aggregates
+        // on every load. Tickets are local since Phase 1 of the WHMCS exit, read fresh.
+        $billingStats = Cache::remember('admin.dashboard.billing_stats', now()->addMinutes(2), function () {
+            $unpaid = Invoice::where('status', 'unpaid')->get(['total', 'currency_code']);
 
             return [
-                'pending_invoices'  => $this->whmcs->getInvoiceCountByStatus('Unpaid'),
-                'overdue_invoices'  => $this->whmcs->getInvoiceCountByStatus('Overdue'),
-                'paid_invoices'     => $this->whmcs->getInvoiceCountByStatus('Paid'),
-                'revenue_waiting'   => round(array_sum(array_map(
-                    fn (array $invoice) => CurrencyConverter::convertToUsd(
-                        (float) ($invoice['balance'] ?? $invoice['total'] ?? 0),
-                        $invoice['currencycode'] ?? 'USD'
-                    ),
-                    $outstanding
-                )), 2),
+                'pending_invoices'   => $unpaid->count(),
+                'cancelled_invoices' => Invoice::where('status', 'cancelled')->count(),
+                'paid_invoices'      => Invoice::where('status', 'paid')->count(),
+                'revenue_waiting'    => round($unpaid->sum(
+                    fn (Invoice $invoice) => CurrencyConverter::convertToUsd((float) $invoice->total, $invoice->currency_code)
+                ), 2),
             ];
         });
 
-        $whmcsStats['open_tickets'] = $this->tickets->getOpenTicketCount();
+        $billingStats['open_tickets'] = $this->tickets->getOpenTicketCount();
 
         return view('admin.dashboard', [
             'stats'        => $stats,
-            'whmcsStats'   => $whmcsStats,
+            'billingStats' => $billingStats,
             'revenueChart' => $this->dailyRevenueChart(),
         ]);
     }

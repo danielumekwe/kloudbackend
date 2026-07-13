@@ -20,7 +20,7 @@
     @endif
 </div>
 
-@if(empty($invoices))
+@if($invoices->isEmpty())
     <div class="card text-center py-16">
         <div class="w-16 h-16 mx-auto rounded-2xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mb-4">
             <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -34,9 +34,9 @@
 @else
     {{-- Invoice summary stats --}}
     @php
-        $unpaidCount  = collect($invoices)->where('status', 'Unpaid')->count();
-        $unpaidTotal  = collect($invoices)->where('status', 'Unpaid')->sum(fn($i) => (float)($i['total'] ?? 0));
-        $paidCount    = collect($invoices)->where('status', 'Paid')->count();
+        $unpaidCount  = $invoices->where('status', 'unpaid')->count();
+        $unpaidTotal  = $invoices->where('status', 'unpaid')->sum(fn($i) => (float) $i->total);
+        $paidCount    = $invoices->where('status', 'paid')->count();
     @endphp
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -83,19 +83,18 @@
     <div class="space-y-3 sm:hidden">
         <h3 class="font-semibold text-slate-900 dark:text-white px-1">All Invoices</h3>
         @foreach($invoices as $invoice)
-        @php $st = strtolower($invoice['status'] ?? ''); @endphp
-        <a href="{{ route('billing.show', $invoice['id']) }}" class="card block">
+        <a href="{{ route('billing.show', $invoice->id) }}" class="card block">
             <div class="flex items-start justify-between gap-3 mb-2">
-                <p class="font-medium text-slate-900 dark:text-white">#{{ $invoice['id'] }}</p>
-                <span class="badge badge-{{ $st === 'paid' ? 'paid' : ($st === 'unpaid' ? 'unpaid' : 'cancelled') }} flex-shrink-0">
-                    {{ $invoice['status'] ?? '' }}
+                <p class="font-medium text-slate-900 dark:text-white">#{{ $invoice->id }}</p>
+                <span class="badge badge-{{ $invoice->status }} flex-shrink-0">
+                    {{ ucfirst($invoice->status) }}
                 </span>
             </div>
             <p class="text-sm font-semibold text-slate-900 dark:text-white">
-                {{ $invoice['currencycode'] ?? '' }} {{ number_format((float)($invoice['total'] ?? 0), 2) }}
+                {{ $invoice->currency_code }} {{ number_format((float) $invoice->total, 2) }}
             </p>
-            <p class="text-xs {{ $st === 'unpaid' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-slate-500 dark:text-slate-400' }} mt-1">
-                Due {{ $invoice['duedate'] ?? '—' }}
+            <p class="text-xs {{ $invoice->status === 'unpaid' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-slate-500 dark:text-slate-400' }} mt-1">
+                {{ $invoice->created_at->format('M j, Y') }}
             </p>
         </a>
         @endforeach
@@ -112,7 +111,6 @@
                     <tr>
                         <th>Invoice #</th>
                         <th>Date</th>
-                        <th>Due Date</th>
                         <th>Amount</th>
                         <th>Status</th>
                         <th></th>
@@ -120,25 +118,21 @@
                 </thead>
                 <tbody>
                     @foreach($invoices as $invoice)
-                    @php $st = strtolower($invoice['status'] ?? ''); @endphp
                     <tr>
-                        <td class="font-medium text-slate-900 dark:text-white">#{{ $invoice['id'] }}</td>
-                        <td>{{ $invoice['date'] ?? '—' }}</td>
-                        <td class="{{ $st === 'unpaid' ? 'text-amber-600 dark:text-amber-400 font-medium' : '' }}">
-                            {{ $invoice['duedate'] ?? '—' }}
-                        </td>
+                        <td class="font-medium text-slate-900 dark:text-white">#{{ $invoice->id }}</td>
+                        <td>{{ $invoice->created_at->format('M j, Y') }}</td>
                         <td class="font-semibold text-slate-900 dark:text-white">
-                            {{ $invoice['currencycode'] ?? '' }} {{ number_format((float)($invoice['total'] ?? 0), 2) }}
+                            {{ $invoice->currency_code }} {{ number_format((float) $invoice->total, 2) }}
                         </td>
                         <td>
-                            <span class="badge badge-{{ $st === 'paid' ? 'paid' : ($st === 'unpaid' ? 'unpaid' : 'cancelled') }}">
-                                {{ $invoice['status'] ?? '' }}
+                            <span class="badge badge-{{ $invoice->status }}">
+                                {{ ucfirst($invoice->status) }}
                             </span>
                         </td>
                         <td>
-                            <a href="{{ route('billing.show', $invoice['id']) }}"
+                            <a href="{{ route('billing.show', $invoice->id) }}"
                                class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">
-                                View {{ $st === 'unpaid' ? '& Pay' : '' }} →
+                                View {{ $invoice->status === 'unpaid' ? '& Pay' : '' }} →
                             </a>
                         </td>
                     </tr>

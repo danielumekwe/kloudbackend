@@ -84,4 +84,16 @@ class PricingConfig
     {
         return (float) PricingSetting::get('domains.whois_privacy_price', config('domains_pricing.whois_privacy_price', 5));
     }
+
+    public static function currencyRate(string $code): float
+    {
+        $default = config("currencies.{$code}.rate", 1.0);
+
+        return (float) PricingSetting::get("currency.rates.{$code}", $default);
+    }
+
+    public static function taxRatePercent(): float
+    {
+        return (float) PricingSetting::get('tax.rate_percent', config('tax.rate_percent', 0));
+    }
 }

@@ -3,25 +3,25 @@
 namespace App\Console\Commands;
 
 use App\Models\DomainOrder;
+use App\Models\Invoice;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
 #[Signature('domains:provision-paid')]
-#[Description('Check pending domain orders for paid WHMCS invoices and register/transfer them on InterServer')]
+#[Description('Check pending domain orders for paid invoices and register/transfer them on InterServer')]
 class ProvisionPaidDomain extends Command
 {
-    public function handle(WhmcsService $whmcs, InterServerService $interserver): int
+    public function handle(InterServerService $interserver): int
     {
         $pending = DomainOrder::where('status', 'pending_payment')->get();
 
         foreach ($pending as $order) {
-            $invoice = $whmcs->getInvoice($order->whmcs_invoice_id);
+            $invoice = Invoice::find($order->invoice_id);
 
-            if (($invoice['status'] ?? '') !== 'Paid') {
+            if (! $invoice || $invoice->status !== 'paid') {
                 continue;
             }
 

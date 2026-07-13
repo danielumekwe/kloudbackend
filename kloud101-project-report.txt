@@ -1,0 +1,553 @@
+================================================================================
+KLOUD101 PORTAL — FULL PROJECT REPORT
+Generated: 2026-06-25
+================================================================================
+
+
+--------------------------------------------------------------------------------
+OVERVIEW
+--------------------------------------------------------------------------------
+
+Laravel-based client portal for VPS, Quick Servers, SSL, and Domain
+provisioning. Payments via Paystack, Flutterwave, and NOWPayments. The project
+has gone through a full multi-phase exit from WHMCS, moving every function
+(tickets, auth, billing) to a local, self-contained system.
+
+Current state:
+  - 10 committed changes since initial commit
+  - Phase 3 (local invoicing) + full admin panel rebuild complete but uncommitted
+  - 124 tests passing, 339 assertions
+  - Zero WHMCS dependencies remaining for any client-facing flow
+
+
+================================================================================
+COMMITTED WORK — 10 COMMITS
+================================================================================
+
+
+--------------------------------------------------------------------------------
+COMMIT 1 — Initial Commit
+--------------------------------------------------------------------------------
+
+Starting point. Laravel client portal with WHMCS as the backend for everything:
+billing, tickets, auth, and services. Three active service types: VPS, SSL,
+Quick Servers, Domains.
+
+
+--------------------------------------------------------------------------------
+COMMIT 2 — Fix IDOR Vulnerabilities in Billing / Support / Server Controllers
+--------------------------------------------------------------------------------
+
+Problem:
+  GetInvoice, GetTicket, and GetClientsProducts were unscoped WHMCS API calls.
+  Any logged-in client could view another client's invoice, read/reply to
+  another client's ticket, or run power/reinstall/password-change actions on
+  another client's server simply by changing the id in the URL.
+
+Fix:
+  Added ownership checks in BillingController, SupportController, and
+  ServerController before acting on any resource — verifying the record
+  belongs to the session's clientId before proceeding.
+
+
+--------------------------------------------------------------------------------
+COMMIT 3 — Move Admin Auth to DB-driven Login + Add Rate Limiting
+--------------------------------------------------------------------------------
+
+Problem:
+  Admin login was a single shared password stored in .env, compared with
+  hash_equals. No per-admin identity, no way to revoke one admin without
+  rotating the password for everyone, and no brute-force protection on any
+  auth route.
+
+Changes:
+  - New `admins` table (email + password hash)
+  - Supports both bcrypt (new) and legacy 32-char MD5 hashes (for hand-set
+    passwords via phpMyAdmin)
+  - Admin forgot/reset-password flow added
+  - Default admin seeded: admin@admin.com / 12345678
+  - Added throttle:6,1 to /login, /register, /password/forgot, /password/reset,
+    /auth/social/complete, /admin/login and its reset routes — none had any
+    brute-force protection before
+
+Bug fixed:
+  Password reset tokens never actually expired. Carbon's diffInMinutes()
+  returns a signed value, so a token from the past produced a negative number
+  that never exceeded the 60-minute threshold. Fixed with abs() in both
+  AdminPasswordResetController and the existing PasswordResetController.
+
+
+--------------------------------------------------------------------------------
+COMMIT 4 — Add RBAC and TOTP 2FA for the Admin Panel
+--------------------------------------------------------------------------------
+
+RBAC:
+  Six admin roles introduced via App\Enums\AdminRole:
+    - super_admin
+    - finance_manager
+    - support_agent
+    - sales_manager
+    - vps_manager
+    - domain_manager
+
+  Pricing page gated to super_admin and finance_manager.
+  New /admin/users section (super_admin only): create/edit/delete admin
+  accounts, assign roles. Guards prevent self-demotion, self-deletion, and
+  removing the last super_admin.
+
+  Sidebar now conditionally shows links based on the logged-in admin's role.
+
+2FA:
+  TOTP via pragmarx/google2fa + bacon/bacon-qr-code.
+  QR code rendered locally as SVG — never sent to a third-party QR service
+  (which would leak the TOTP secret).
+  Self-service setup/disable/recovery-codes at /admin/security.
+  Login detects 2FA-enabled admins and routes them through
+  /admin/two-factor-challenge before completing the session.
+  Recovery codes consume on use.
+
+Bug fixed:
+  two_factor_secret, two_factor_recovery_codes, and two_factor_confirmed_at
+  were not in Admin::$fillable, so the entire confirm/disable/regenerate
+  flow was silently a no-op. Fixed by adding them to $fillable.
+
+
+--------------------------------------------------------------------------------
+COMMIT 5 — Add Admin Dashboard Overview (Stats + 30-day Revenue Chart)
+--------------------------------------------------------------------------------
+
+New /admin/dashboard landing page (default post-login redirect).
+
+Stats shown:
+  - Total and monthly revenue (local PaymentTransaction, USD-converted)
+  - Active VPS count
+  - Active domain count
+  - Pending orders (all order types)
+  - Invoice counts by status (pending/overdue/paid) — sourced from WHMCS
+  - Open ticket count
+
+30-day revenue trend chart using Chart.js (only the line/scale/tooltip
+components loaded — not the full bundle).
+
+Added CurrencyConverter::convertToUsd() — payments and invoice balances
+are stored in whatever currency was charged, so summing them for dashboard
+totals required a common USD base.
+
+
+--------------------------------------------------------------------------------
+COMMIT 6 — Phase 1 WHMCS Exit: Move Support Tickets Off WHMCS
+--------------------------------------------------------------------------------
+
+New local tables:
+  - support_departments
+  - support_tickets
+  - ticket_replies
+
+New TicketService whose methods mirror WHMCS's ticket API shape closely
+enough that SupportController and AdminDashboardController needed only a
+one-line swap per call site. Blade views needed zero changes.
+
+SupportController::ensureOwnsTicket() now does a single indexed query
+instead of re-fetching the full ticket list, since WHMCS's GetTicket had
+no clientid filter available.
+
+One-time Artisan command:
+  php artisan whmcs:migrate-tickets
+  Reads from a read-only `whmcs` DB connection, imports existing WHMCS
+  ticket history, preserving original WHMCS ids as local primary keys.
+
+Bug fixed:
+  Eloquent's updateOrCreate(['id' => ...], ...) silently drops `id` on
+  the create path since `id` is not in $fillable. Fixed with forceFill()
+  in the migration command rather than loosening $fillable (which would
+  be a mass-assignment vulnerability in normal code paths).
+
+Bug fixed (regression):
+  HomeController was still calling WhmcsService::getTickets() — a missed
+  call site from this phase.
+
+Test coverage:
+  Full HTTP-level workflow test: open ticket → list → reply → close →
+  reply-after-close rejected.
+
+
+--------------------------------------------------------------------------------
+COMMIT 7 — Phase 2 WHMCS Exit: Move Client Auth/Identity Off WHMCS
+--------------------------------------------------------------------------------
+
+Local `clients` table is now the system of record for:
+  - Login
+  - Registration (manual and social/OAuth)
+  - Password reset
+  - Profile management
+
+Controllers updated:
+  LoginController, RegisterController, SocialLoginController,
+  PasswordResetController, ProfileController.
+
+WhmcsAuth renamed to ClientAuth.
+
+Shadow WHMCS client:
+  At this stage (before Phase 3), registration still created a best-effort
+  "shadow" WHMCS client via AddClient so that invoicing kept working.
+  This never blocks signup if it fails — a WHMCS outage no longer prevents
+  registration, it only delays that client's invoicing.
+
+New whmcs_client_id column on clients:
+  WHMCS assigns its own id, unrelated to the local client id. Passing the
+  local id to WHMCS invoice/billing calls would silently land invoices on
+  unrelated WHMCS clients. Every WHMCS-bound call (createInvoice,
+  GetClientsProducts, GetInvoices, UpdateClient) now resolves through
+  whmcs_client_id.
+
+New Artisan command:
+  php artisan whmcs:migrate-clients
+  Reads from read-only `whmcs` DB connection, imports existing clients,
+  backfills whmcs_client_id = whmcs id.
+
+Bug fixed:
+  Admin::checkPassword() and Client::checkPassword() crashed with HTTP 500
+  instead of failing closed when the stored hash format was unrecognised.
+  Hash::check() throws for unknown formats rather than returning false.
+  Specific risk for Client: passwords imported byte-for-byte from WHMCS
+  with no guaranteed format.
+
+Bug fixed:
+  HomeController was still calling WhmcsService::getTickets() after Phase 1
+  moved tickets local — second occurrence of this missed call site.
+
+126 tests passing (42 new/rewritten in this phase).
+
+
+--------------------------------------------------------------------------------
+COMMIT 8 — Notifications, Admin Client Management, Ticket Overhaul, Mobile Fixes
+--------------------------------------------------------------------------------
+
+Transactional email notifications (ZeptoMail):
+  - Ticket created
+  - Ticket answered
+  - Ticket closed
+  - Order confirmation
+  - Login alert with IP geolocation
+
+Admin panel additions:
+  - Full client list with search
+  - Edit client details
+  - Suspend/unsuspend client
+  - Reset client password
+  - Admin ticket reply UI
+  - Obfuscated account/ticket codes: KLD- prefix for accounts, TKT- for tickets
+
+Registration:
+  - Non-blocking email verification (signup completes immediately, verify later)
+
+UI:
+  - Mobile-responsive dashboard layout fixes
+  - Services header dropdown menu
+
+
+--------------------------------------------------------------------------------
+COMMIT 9 — Add Kloud101 Brand Logo and Favicon
+--------------------------------------------------------------------------------
+
+  - Cloud+K mark added to sidebar, header badges, and auth page
+  - Replaced placeholder icon
+  - Transparent favicon (works on any background colour)
+  - Wordmark rendered as themed CSS text, not a raster image
+    (adapts correctly to light and dark mode)
+
+
+--------------------------------------------------------------------------------
+COMMIT 10 — Replace Broken "Order a Server" Page with Service Catalog
+--------------------------------------------------------------------------------
+
+Problem:
+  The /servers/order page called WHMCS's GetProducts API, which the app no
+  longer relies on and which returned no usable plans. It always showed
+  "No plans available."
+
+Fix:
+  Replaced with a proper service catalog page that links directly to:
+    - VPS order page
+    - Quick Servers order page
+    - SSL order page
+    - Domain order page
+  Mirrors the existing +Services header dropdown menu.
+  Removed the now-dead WHMCS order/payment methods this page depended on.
+
+
+================================================================================
+UNCOMMITTED WORK — BUILT AND VERIFIED (124 TESTS PASSING)
+================================================================================
+
+These changes are complete, tested, and working. Not yet committed.
+
+
+--------------------------------------------------------------------------------
+PHASE 3 WHMCS EXIT — Full Local Invoicing
+--------------------------------------------------------------------------------
+
+The core problem this solves:
+  Any client without a whmcs_client_id was permanently blocked from placing
+  any order: "We're still setting up your billing account." This happened
+  when the shadow WHMCS client creation failed at registration (e.g. WHMCS
+  already had an account with that email). These clients could never order
+  anything. Phase 3 removes the dependency entirely — for every client,
+  permanently.
+
+Database changes:
+  New tables:
+    - invoices
+        id, client_id, status (unpaid|paid|cancelled), currency_code,
+        subtotal, tax_rate, tax_amount, total, payment_method, paid_at,
+        timestamps
+    - invoice_items
+        id, invoice_id (FK → invoices), description, amount, timestamps
+
+  Renamed columns on 6 tables (whmcs_invoice_id → invoice_id):
+    - vps_orders
+    - qs_orders
+    - ssl_orders
+    - domain_orders
+    - domain_renewals
+    - payment_transactions
+
+New models:
+  - app/Models/Invoice.php
+  - app/Models/InvoiceItem.php
+
+New config files:
+  - config/currencies.php  — currency definitions with exchange rates
+  - config/tax.php         — flat tax rate percentage
+
+New service:
+  - app/Services/InvoiceService.php
+    create(Client, description, amountUsd, currencyCode): Invoice
+    Handles currency conversion + tax calculation internally.
+    Replaces all WhmcsService::createInvoice() call sites.
+
+Admin billing settings:
+  - New page: /admin/billing-settings
+  - Edit currency exchange rates (per currency)
+  - Edit flat tax rate
+  - Role-gated: super_admin and finance_manager only
+
+Controllers rewritten (6 order controllers):
+  VpsController, QsController, SslController, DomainsController
+  Before: required whmcs_client_id guard → currency sync → WHMCS invoice
+  After:  InvoiceService::create() — no WHMCS, no guard, no pre-computation
+
+PaymentService::recordPayment():
+  WHMCS API calls replaced with local Invoice model operations.
+  Invoice paid = invoice->update(['status' => 'paid', 'paid_at' => now()])
+
+PaymentController:
+  Invoice::find($id) instead of WhmcsService::getInvoice($id)
+
+WebhookController (Paystack, Flutterwave, NOWPayments):
+  Same Invoice::find() swap.
+  NOWPayments client lookup now uses $invoice->client_id directly instead
+  of the WHMCS userid reverse-lookup dance.
+
+BillingController + billing views:
+  Reads local Invoice model.
+  Blade views updated: Eloquent attributes instead of WHMCS array keys.
+
+HomeController:
+  Local invoices instead of WHMCS.
+
+AdminDashboardController:
+  Revenue and invoice stats from local DB.
+
+5 Provision* commands (identical one-line change each):
+  ProvisionPaidVps, ProvisionPaidQs, ProvisionPaidSsl,
+  ProvisionPaidDomain, ProvisionPaidDomainRenewal
+  Now check: Invoice::find($order->invoice_id)->status === 'paid'
+  Instead of: WhmcsService::getInvoice($order->whmcs_invoice_id)['status'] === 'Paid'
+
+Shadow WHMCS client creation removed:
+  RegisterController::createShadowWhmcsClient() deleted entirely.
+  Same removal in SocialLoginController.
+  New clients never get a whmcs_client_id. Nothing downstream needs it.
+
+Dead WhmcsService methods removed:
+  createInvoice, getInvoice, getInvoices, addInvoicePayment,
+  getOutstandingInvoices, getInvoiceCountByStatus,
+  getCurrencies, switchClientCurrency
+
+Remaining WhmcsService methods (still used for legacy Servers product):
+  getProducts, getClientServices, getClientDetails, getClientByEmail,
+  addClient, updateClient
+
+
+--------------------------------------------------------------------------------
+FULL ADMIN PANEL REBUILD
+--------------------------------------------------------------------------------
+
+Previous sidebar contained a "WHMCS Admin" external link.
+Replaced with a fully local admin panel covering every management function.
+
+New sidebar structure:
+  Dashboard
+  SERVICES
+    - Services       /admin/services
+    - Orders         /admin/orders
+    - Pricing        /admin/pricing  (existing)
+  BILLING
+    - Invoices       /admin/invoices
+    - Transactions   /admin/transactions
+    - Billing Settings /admin/billing-settings
+  CLIENTS & SUPPORT
+    - Clients        /admin/clients  (existing, enhanced)
+    - Support Tickets /admin/tickets (existing)
+  COMMUNICATIONS
+    - Newsletter     /admin/communications/newsletter
+  SETTINGS
+    - Security       /admin/security (existing)
+    - Admin Users    /admin/users    (existing)
+
+
+New admin pages and capabilities:
+
+  SERVICES — /admin/services
+    Filter by type (VPS, Quick Server, SSL, Domain) and status
+    (Active, Suspended, Cancelled, Failed, Pending)
+    Stats cards: total, active, suspended, cancelled, failed
+    Each active VPS or QS has a "Manage →" link to the detail page
+
+  VPS DETAIL — /admin/services/vps/{id}
+    Header: hostname, status badge, client link, InterServer ID, IP,
+            plan, price, live OS/HDD/RAM from InterServer API
+    Power & Status:
+      - Start       (calls InterServer startVps, sets status=provisioned)
+      - Restart     (calls InterServer restartVps)
+      - Suspend     (calls InterServer stopVps, sets status=suspended,
+                     sends cancellation email to client)
+      - Unsuspend   (calls InterServer startVps, sets status=provisioned)
+      - Cancel/Terminate (calls InterServer cancelVps, sets status=cancelled,
+                          sends cancellation email, double-confirm required)
+      - Open Console (No Password) — calls InterServer getViewDesktop,
+                          redirects admin to noVNC URL
+    Change Root Password:
+      Collapsible form — direct API call to InterServer
+    Reinstall OS:
+      Collapsible form with amber warning banner
+      Template select loads available OS templates live from InterServer API
+      Password input — executes reinstall
+
+  QS DETAIL — /admin/services/qs/{id}
+    Same structure and management actions as VPS detail, adapted for
+    Quick Servers
+
+  ORDERS — /admin/orders
+    Order history across all service types (VPS, QS, SSL, Domain)
+    Stats: total orders, provisioned, pending, failed
+    Filter by type and status
+    Links to client profile for each order
+
+  INVOICES — /admin/invoices
+    Paginated list with status filter (unpaid/paid/cancelled)
+    Stats: total invoices, unpaid count, total revenue collected
+    Individual invoice view (/admin/invoices/{id}):
+      - Invoice header (client, date, amounts, status)
+      - Line items table
+      - Payment transactions table
+      - Mark as Paid button (unpaid invoices only, sets payment_method=manual)
+      - Cancel button (unpaid invoices only)
+
+  TRANSACTIONS — /admin/transactions
+    All PaymentTransaction records
+    Filter by gateway (Paystack, Flutterwave, NOWPayments) and status
+    Stats: total transactions, completed count, total volume (USD)
+
+  BILLING SETTINGS — /admin/billing-settings
+    Edit exchange rates per currency
+    Edit flat tax rate percentage
+    Role-gated: super_admin and finance_manager only
+
+  CLIENT DETAIL — /admin/clients/{id}  (enhanced)
+    Now shows:
+      - Client's invoices (top 10, with status badges and links)
+      - Client's orders (top 10, unified across all service types)
+      - Add Credit form (collapsible, increments credit_balance)
+      - Send Email to Client form (collapsible, subject + body)
+    Removed: "WHMCS linked" field
+    Added: Country field
+
+  NEWSLETTER — /admin/communications/newsletter
+    Compose subject and body (plain text, line breaks preserved)
+    Info banner shows count of verified clients who will receive it
+    Two-step confirmation: button changes to
+      "Confirm — send to N clients" before submitting
+    Emails queued (background delivery, doesn't block the request)
+    Only sends to clients with email_verified_at set
+
+
+--------------------------------------------------------------------------------
+LIFECYCLE EMAILS
+--------------------------------------------------------------------------------
+
+All emails are queued (ShouldQueue) for background delivery.
+
+Auto-triggered emails:
+
+  VPS / QS Provisioned (VpsProvisionedMail)
+    Trigger:  ProvisionPaidVps or ProvisionPaidQs command succeeds
+    Subject:  "Your VPS is ready — {hostname}"
+    Content:  Hostname, plan name, link to dashboard
+
+  VPS / QS Provisioning Failed (VpsFailedMail)
+    Trigger:  ProvisionPaidVps or ProvisionPaidQs command fails
+    Subject:  "VPS provisioning issue — action may be required"
+    Content:  Plan name, link to open a support ticket
+
+  Service Cancelled (ServiceCancelledMail)
+    Trigger:  Admin cancels or suspends a VPS/QS from the admin panel
+    Subject:  "Service cancelled — {description}"
+    Content:  Service type, description, link to support
+
+Admin-triggered emails:
+
+  Admin Message (AdminMessageMail)
+    Trigger:  Admin uses "Send Email to Client" on the client detail page
+    Subject:  Whatever the admin typed
+    Content:  Free-form body, line breaks preserved
+
+  Newsletter (NewsletterMail)
+    Trigger:  Admin sends from /admin/communications/newsletter
+    Subject:  Whatever the admin typed
+    Content:  Free-form body, branded header, line breaks preserved
+
+
+================================================================================
+STATISTICS
+================================================================================
+
+  Commits in repository:        10
+  Modified files (uncommitted): ~50
+  New files (uncommitted):      ~31
+  Test suite:                   124 tests, 339 assertions, all passing
+  WHMCS dependencies (client-facing): 0
+
+  Services still using WHMCS:
+    - Legacy "Servers" product line (ServerController, HomeController::getClientServices)
+      Uses whmcs_client_id for GetClientsProducts ModuleCommand API calls only.
+      Explicitly out of scope for the WHMCS exit.
+
+
+================================================================================
+WHMCS EXIT SUMMARY
+================================================================================
+
+  Phase 1 — Support Tickets     COMPLETE (committed, commit 6)
+  Phase 2 — Client Auth         COMPLETE (committed, commit 7)
+  Phase 3 — Billing/Invoicing   COMPLETE (uncommitted)
+
+  Result: New clients can register, order, and pay without any WHMCS
+  interaction at any point. The original "We're still setting up your
+  billing account" error is permanently eliminated for all clients.
+
+
+================================================================================
+END OF REPORT
+================================================================================

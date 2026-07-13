@@ -3,67 +3,45 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
+use App\Models\Invoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Request as ClientRequest;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BillingAccessControlTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function fakeWhmcs(int $invoiceOwnerId): void
-    {
-        Http::fake(function (ClientRequest $request) use ($invoiceOwnerId) {
-            $action = $request->data()['action'] ?? null;
-
-            return match ($action) {
-                'GetInvoice' => Http::response([
-                    'result' => 'success',
-                    'invoiceid' => 42,
-                    'userid' => $invoiceOwnerId,
-                    'currencycode' => 'USD',
-                    'date' => '2026-06-01',
-                    'duedate' => '2026-06-15',
-                    'status' => 'Unpaid',
-                    'subtotal' => '10.00',
-                    'tax' => '0.00',
-                    'total' => '10.00',
-                    'credit' => '0.00',
-                    'paymentmethod' => 'banktransfer',
-                    'items' => ['item' => []],
-                    'transactions' => ['transaction' => []],
-                ]),
-                'GetCurrencies' => Http::response(['result' => 'error']),
-                default => Http::response(['result' => 'error'], 404),
-            };
-        });
-    }
-
-    private function makeClient(?int $whmcsClientId): Client
+    private function makeClient(): Client
     {
         return Client::create([
             'email' => 'client-' . uniqid() . '@example.com', 'password' => 'x',
-            'firstname' => 'Jane', 'lastname' => 'Doe', 'whmcs_client_id' => $whmcsClientId,
+            'firstname' => 'Jane', 'lastname' => 'Doe',
         ]);
     }
 
     public function test_client_cannot_view_another_clients_invoice(): void
     {
-        $client = $this->makeClient(whmcsClientId: 7);
-        $this->fakeWhmcs(invoiceOwnerId: 999);
+        $client = $this->makeClient();
+        $otherClient = $this->makeClient();
+        $invoice = Invoice::create([
+            'client_id' => $otherClient->id, 'status' => 'unpaid', 'currency_code' => 'USD',
+            'subtotal' => 10.00, 'total' => 10.00,
+        ]);
 
-        $response = $this->withSession(['clientId' => $client->id])->get('/billing/42');
+        $response = $this->withSession(['clientId' => $client->id])->get("/billing/{$invoice->id}");
 
         $response->assertStatus(404);
     }
 
     public function test_client_can_view_their_own_invoice(): void
     {
-        $client = $this->makeClient(whmcsClientId: 7);
-        $this->fakeWhmcs(invoiceOwnerId: 7);
+        $client = $this->makeClient();
+        $invoice = Invoice::create([
+            'client_id' => $client->id, 'status' => 'unpaid', 'currency_code' => 'USD',
+            'subtotal' => 10.00, 'total' => 10.00,
+        ]);
 
-        $response = $this->withSession(['clientId' => $client->id])->get('/billing/42');
+        $response = $this->withSession(['clientId' => $client->id])->get("/billing/{$invoice->id}");
 
         $response->assertOk();
     }

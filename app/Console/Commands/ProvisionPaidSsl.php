@@ -2,26 +2,26 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Invoice;
 use App\Models\SslOrder;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
 #[Signature('ssl:provision-paid')]
-#[Description('Check pending SSL certificate orders for paid WHMCS invoices and provision them on InterServer')]
+#[Description('Check pending SSL certificate orders for paid invoices and provision them on InterServer')]
 class ProvisionPaidSsl extends Command
 {
-    public function handle(WhmcsService $whmcs, InterServerService $interserver): int
+    public function handle(InterServerService $interserver): int
     {
         $pending = SslOrder::where('status', 'pending_payment')->get();
 
         foreach ($pending as $order) {
-            $invoice = $whmcs->getInvoice($order->whmcs_invoice_id);
+            $invoice = Invoice::find($order->invoice_id);
 
-            if (($invoice['status'] ?? '') !== 'Paid') {
+            if (! $invoice || $invoice->status !== 'paid') {
                 continue;
             }
 

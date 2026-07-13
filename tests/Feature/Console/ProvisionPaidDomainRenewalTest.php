@@ -4,6 +4,7 @@ namespace Tests\Feature\Console;
 
 use App\Models\DomainOrder;
 use App\Models\DomainRenewal;
+use App\Models\Invoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
@@ -13,11 +14,18 @@ class ProvisionPaidDomainRenewalTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeRenewal(array $overrides = []): DomainRenewal
+    private function makeInvoice(string $status = 'paid'): Invoice
+    {
+        return Invoice::create([
+            'client_id' => 7, 'status' => $status, 'currency_code' => 'USD',
+            'subtotal' => 30.00, 'total' => 30.00,
+        ]);
+    }
+
+    private function makeRenewal(Invoice $invoice, array $overrides = []): DomainRenewal
     {
         $order = DomainOrder::create([
             'client_id' => 7,
-            'whmcs_invoice_id' => 41,
             'interserver_domain_id' => 555,
             'domain_name' => 'example',
             'tld' => 'com',
@@ -31,7 +39,7 @@ class ProvisionPaidDomainRenewalTest extends TestCase
 
         return DomainRenewal::create(array_merge([
             'domain_order_id' => $order->id,
-            'whmcs_invoice_id' => 99,
+            'invoice_id' => $invoice->id,
             'years' => 2,
             'price' => 30.00,
             'status' => 'pending_payment',
@@ -39,12 +47,9 @@ class ProvisionPaidDomainRenewalTest extends TestCase
         ], $overrides));
     }
 
-    private function fakeApis(string $invoiceStatus, array $renewResponse): void
+    private function fakeApi(array $renewResponse): void
     {
-        Http::fake(function (ClientRequest $request) use ($invoiceStatus, $renewResponse) {
-            if (str_contains($request->url(), 'includes/api.php')) {
-                return Http::response(['result' => 'success', 'status' => $invoiceStatus]);
-            }
+        Http::fake(function (ClientRequest $request) use ($renewResponse) {
             if (str_contains($request->url(), '/renew')) {
                 return Http::response($renewResponse);
             }
@@ -54,8 +59,9 @@ class ProvisionPaidDomainRenewalTest extends TestCase
 
     public function test_skips_renewal_whose_invoice_is_not_paid(): void
     {
-        $renewal = $this->makeRenewal();
-        $this->fakeApis('Unpaid', ['success' => true]);
+        $invoice = $this->makeInvoice('unpaid');
+        $renewal = $this->makeRenewal($invoice);
+        $this->fakeApi(['success' => true]);
 
         $this->artisan('domains:provision-paid-renewal')->assertExitCode(0);
 
@@ -66,8 +72,9 @@ class ProvisionPaidDomainRenewalTest extends TestCase
 
     public function test_completes_renewal_for_paid_invoice(): void
     {
-        $renewal = $this->makeRenewal();
-        $this->fakeApis('Paid', ['success' => true]);
+        $invoice = $this->makeInvoice('paid');
+        $renewal = $this->makeRenewal($invoice);
+        $this->fakeApi(['success' => true]);
 
         $this->artisan('domains:provision-paid-renewal')->assertExitCode(0);
 
@@ -84,8 +91,9 @@ class ProvisionPaidDomainRenewalTest extends TestCase
 
     public function test_marks_renewal_failed_when_interserver_rejects_it(): void
     {
-        $renewal = $this->makeRenewal();
-        $this->fakeApis('Paid', ['success' => false, 'message' => 'Domain not eligible for renewal']);
+        $invoice = $this->makeInvoice('paid');
+        $renewal = $this->makeRenewal($invoice);
+        $this->fakeApi(['success' => false, 'message' => 'Domain not eligible for renewal']);
 
         $this->artisan('domains:provision-paid-renewal')->assertExitCode(0);
 
@@ -96,8 +104,9 @@ class ProvisionPaidDomainRenewalTest extends TestCase
 
     public function test_does_not_retry_a_renewal_stuck_provisioning_from_a_crashed_run(): void
     {
-        $renewal = $this->makeRenewal(['status' => 'provisioning']);
-        $this->fakeApis('Paid', ['success' => true]);
+        $invoice = $this->makeInvoice('paid');
+        $renewal = $this->makeRenewal($invoice, ['status' => 'provisioning']);
+        $this->fakeApi(['success' => true]);
 
         $this->artisan('domains:provision-paid-renewal')->assertExitCode(0);
 

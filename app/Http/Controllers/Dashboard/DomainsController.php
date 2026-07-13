@@ -8,9 +8,10 @@ use App\Models\Client;
 use App\Models\DomainOrder;
 use App\Models\DomainRenewal;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
+use App\Services\InvoiceService;
 use App\Support\CurrencyConverter;
 use App\Support\PricingConfig;
+use App\Support\ProductCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class DomainsController extends Controller
 {
     public function __construct(
         private InterServerService $interserver,
-        private WhmcsService $whmcs,
+        private InvoiceService $invoices,
     ) {}
 
     /**
@@ -71,8 +72,8 @@ class DomainsController extends Controller
             'available'     => $result['available'] ?? false,
             'premium'       => $result['premium'] ?? false,
             'whois_privacy' => $result['whois_privacy'] ?? false,
-            'price'         => CurrencyConverter::convertFromUsd($this->computePrice($tld, (float) ($result['new'] ?? 0)), $currencyCode),
-            'renewal_price' => CurrencyConverter::convertFromUsd($this->computePrice($tld, (float) ($result['renewal'] ?? 0)), $currencyCode),
+            'price'         => ProductCatalog::price('domain', $tld, 12, $currencyCode, $this->computePrice($tld, (float) ($result['new'] ?? 0))),
+            'renewal_price' => ProductCatalog::price('domain', $tld, 12, $currencyCode, $this->computePrice($tld, (float) ($result['renewal'] ?? 0))),
             'fields'        => $result['fields'] ?? [],
         ]);
     }
@@ -102,7 +103,7 @@ class DomainsController extends Controller
             'tld'           => $tld,
             'fields'        => $lookup['fields'] ?? [],
             'whoisPrivacy'  => $lookup['whois_privacy'] ?? false,
-            'price'         => CurrencyConverter::convertFromUsd($this->computePrice($tld, (float) ($lookup['new'] ?? 0)), $currencyCode),
+            'price'         => ProductCatalog::price('domain', $tld, 12, $currencyCode, $this->computePrice($tld, (float) ($lookup['new'] ?? 0))),
             'currency'      => CurrencyConverter::symbol($currencyCode),
         ]);
     }
@@ -125,15 +126,16 @@ class DomainsController extends Controller
         }
 
         $tld = $this->extractTld($validated['domain']);
-        $priceUsd = $this->computePrice($tld, (float) ($lookup['new'] ?? 0)) * $validated['registration_years'];
+        $currencyCode = session('currency', 'USD');
+        $regTotalUsd = round($this->computePrice($tld, (float) ($lookup['new'] ?? 0)) * $validated['registration_years'], 2);
+
+        $price = ProductCatalog::price('domain', $tld, $validated['registration_years'] * 12, $currencyCode, $regTotalUsd);
 
         if ($validated['whois_privacy'] ?? false) {
-            $priceUsd += PricingConfig::domainsWhoisPrivacyPrice();
+            $price += CurrencyConverter::convertFromUsd(PricingConfig::domainsWhoisPrivacyPrice(), $currencyCode);
         }
 
-        $price = CurrencyConverter::convertFromUsd(round($priceUsd, 2), session('currency', 'USD'));
-
-        return response()->json(['price' => $price]);
+        return response()->json(['price' => round($price, 2)]);
     }
 
     /**
@@ -153,51 +155,34 @@ class DomainsController extends Controller
         }
 
         $unitPrice = $this->computePrice($tld, (float) ($lookup['new'] ?? 0));
-        $priceUsd = $unitPrice * $validated['registration_years'];
+        $regTotalUsd = round($unitPrice * $validated['registration_years'], 2);
+        $priceUsd = $regTotalUsd;
         if ($validated['whois_privacy'] ?? false) {
             $priceUsd += PricingConfig::domainsWhoisPrivacyPrice();
         }
         $priceUsd = round($priceUsd, 2);
 
         $currencyCode = session('currency', 'USD');
-        $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
-        $price        = round($priceUsd * $currencyRate, 2);
-
-        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
-        // whmcs_client_id, never the local id directly — they only coincide for
-        // clients migrated before the WHMCS exit (see the migration plan).
+        $price = ProductCatalog::price('domain', $tld, $validated['registration_years'] * 12, $currencyCode, $regTotalUsd);
+        if ($validated['whois_privacy'] ?? false) {
+            $price += CurrencyConverter::convertFromUsd(PricingConfig::domainsWhoisPrivacyPrice(), $currencyCode);
+        }
+        $price = round($price, 2);
         $client = Client::find($clientId);
-        $whmcsClientId = $client?->whmcs_client_id;
-
-        if (! $whmcsClientId) {
-            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
-        }
-
-        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
-            return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
-        }
 
         $orderDescription = "Domain Registration — {$validated['domain']} ({$validated['registration_years']}yr)";
 
-        $invoice = $this->whmcs->createInvoice(
-            $whmcsClientId,
-            $orderDescription,
-            $price,
-        );
-
-        if (($invoice['result'] ?? '') !== 'success') {
-            return back()->with('error', 'Could not create your invoice. Please contact support.')->withInput();
-        }
+        $invoice = $this->invoices->createAt($client, $orderDescription, $price, $currencyCode);
 
         DomainOrder::create([
             'client_id'           => $clientId,
-            'whmcs_invoice_id'    => $invoice['invoiceid'],
+            'invoice_id'          => $invoice->id,
             'domain_name'         => explode('.', $validated['domain'], 2)[0],
             'tld'                 => $tld,
             'order_type'          => 'register',
             'registration_years'  => $validated['registration_years'],
             'status'              => 'pending_payment',
-            'price'               => $price,
+            'price'               => $invoice->total,
             'whois_privacy'       => $validated['whois_privacy'] ?? false,
             'registrant_contact'  => $validated['contact'],
             'config'              => [
@@ -209,12 +194,12 @@ class DomainsController extends Controller
         Mail::to($client->email)->send(new OrderConfirmationMail(
             $client->firstname,
             $orderDescription,
-            $price,
+            $invoice->total,
             $currencyCode,
-            $invoice['invoiceid'],
+            $invoice->id,
         ));
 
-        return redirect()->route('billing.show', $invoice['invoiceid'])
+        return redirect()->route('billing.show', $invoice->id)
             ->with('success', 'Your domain order has been created. It will be registered automatically as soon as this invoice is paid.');
     }
 
@@ -234,44 +219,22 @@ class DomainsController extends Controller
         $priceUsd = round($this->computePrice($tld, (float) ($lookup['transfer'] ?? $lookup['new'] ?? 0)), 2);
 
         $currencyCode = session('currency', 'USD');
-        $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
-        $price        = round($priceUsd * $currencyRate, 2);
-
-        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
-        // whmcs_client_id, never the local id directly — they only coincide for
-        // clients migrated before the WHMCS exit (see the migration plan).
+        $price = ProductCatalog::price('domain', $tld, 12, $currencyCode, $priceUsd);
         $client = Client::find($clientId);
-        $whmcsClientId = $client?->whmcs_client_id;
-
-        if (! $whmcsClientId) {
-            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
-        }
-
-        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
-            return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
-        }
 
         $orderDescription = "Domain Transfer — {$validated['domain']}";
 
-        $invoice = $this->whmcs->createInvoice(
-            $whmcsClientId,
-            $orderDescription,
-            $price,
-        );
-
-        if (($invoice['result'] ?? '') !== 'success') {
-            return back()->with('error', 'Could not create your invoice. Please contact support.')->withInput();
-        }
+        $invoice = $this->invoices->createAt($client, $orderDescription, $price, $currencyCode);
 
         DomainOrder::create([
             'client_id'           => $clientId,
-            'whmcs_invoice_id'    => $invoice['invoiceid'],
+            'invoice_id'          => $invoice->id,
             'domain_name'         => explode('.', $validated['domain'], 2)[0],
             'tld'                 => $tld,
             'order_type'          => 'transfer',
             'registration_years'  => $validated['registration_years'],
             'status'              => 'pending_payment',
-            'price'               => $price,
+            'price'               => $invoice->total,
             'whois_privacy'       => $validated['whois_privacy'] ?? false,
             'registrant_contact'  => $validated['contact'],
             'config'              => [
@@ -284,12 +247,12 @@ class DomainsController extends Controller
         Mail::to($client->email)->send(new OrderConfirmationMail(
             $client->firstname,
             $orderDescription,
-            $price,
+            $invoice->total,
             $currencyCode,
-            $invoice['invoiceid'],
+            $invoice->id,
         ));
 
-        return redirect()->route('billing.show', $invoice['invoiceid'])
+        return redirect()->route('billing.show', $invoice->id)
             ->with('success', 'Your transfer request has been created. It will be initiated automatically as soon as this invoice is paid.');
     }
 
@@ -549,45 +512,23 @@ class DomainsController extends Controller
         $priceUsd = round($unitPrice * $validated['years'], 2);
 
         $currencyCode = session('currency', 'USD');
-        $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
-        $price        = round($priceUsd * $currencyRate, 2);
-
-        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
-        // whmcs_client_id, never the local id directly — they only coincide for
-        // clients migrated before the WHMCS exit (see the migration plan).
-        $client = Client::find($order->client_id);
-        $whmcsClientId = $client?->whmcs_client_id;
-
-        if (! $whmcsClientId) {
-            return response()->json(['success' => false, 'message' => 'We\'re still setting up your billing account. Please try again shortly or contact support.'], 422);
-        }
-
         // Renewal currency intentionally tracks the client's *current* session currency,
         // not whatever the original order/domain was invoiced in — each renewal is its
         // own transaction and the client may have switched currency since.
-        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
-            return response()->json(['success' => false, 'message' => 'Could not switch your billing currency. Please try again or contact support.'], 422);
-        }
+        $price = ProductCatalog::price('domain', $order->tld, $validated['years'] * 12, $currencyCode, $priceUsd);
+        $client = Client::find($order->client_id);
 
         $orderDescription = "Domain Renewal — {$order->domain_name}.{$order->tld} ({$validated['years']}yr)";
 
-        $invoice = $this->whmcs->createInvoice(
-            $whmcsClientId,
-            $orderDescription,
-            $price,
-        );
-
-        if (($invoice['result'] ?? '') !== 'success') {
-            return response()->json(['success' => false, 'message' => 'Could not create your renewal invoice. Please contact support.'], 422);
-        }
+        $invoice = $this->invoices->createAt($client, $orderDescription, $price, $currencyCode);
 
         DomainRenewal::create([
-            'domain_order_id'  => $order->id,
-            'whmcs_invoice_id' => $invoice['invoiceid'],
-            'years'            => $validated['years'],
-            'price'            => $price,
-            'status'           => 'pending_payment',
-            'config'           => [
+            'domain_order_id' => $order->id,
+            'invoice_id'      => $invoice->id,
+            'years'           => $validated['years'],
+            'price'           => $invoice->total,
+            'status'          => 'pending_payment',
+            'config'          => [
                 'currency'   => $currencyCode,
                 'amount_usd' => $priceUsd,
             ],
@@ -596,12 +537,12 @@ class DomainsController extends Controller
         Mail::to($client->email)->send(new OrderConfirmationMail(
             $client->firstname,
             $orderDescription,
-            $price,
+            $invoice->total,
             $currencyCode,
-            $invoice['invoiceid'],
+            $invoice->id,
         ));
 
-        return response()->json(['success' => true, 'message' => 'Renewal invoice created.', 'invoice_id' => $invoice['invoiceid']]);
+        return response()->json(['success' => true, 'message' => 'Renewal invoice created.', 'invoice_id' => $invoice->id]);
     }
 
     public function transferShow(int $orderId): JsonResponse

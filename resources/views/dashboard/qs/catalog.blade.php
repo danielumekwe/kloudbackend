@@ -76,7 +76,11 @@
 
         <div>
             <label class="form-label">Root Password</label>
-            <input type="password" name="password" x-model="password" placeholder="At least 8 characters, mixed case, number, symbol" class="form-input">
+            <div class="flex gap-2">
+                <input :type="showPassword ? 'text' : 'password'" name="password" x-model="password" placeholder="At least 8 characters, mixed case, number, symbol" class="form-input flex-1">
+                <button type="button" @click="showPassword = !showPassword" class="btn btn-secondary px-3" x-text="showPassword ? 'Hide' : 'Show'"></button>
+                <button type="button" @click="password = generateStrongPassword(); showPassword = true" class="btn btn-secondary px-3 whitespace-nowrap">Generate</button>
+            </div>
         </div>
 
         <div>
@@ -125,6 +129,7 @@ function qsOrder(opts) {
         distro: Object.keys(opts.templates)[0] || '',
         os: '',
         password: '',
+        showPassword: false,
         comment: '',
 
         price: null,

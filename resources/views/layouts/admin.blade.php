@@ -131,9 +131,28 @@
 
                 @php($role = \App\Enums\AdminRole::tryFrom(session('adminRole')))
 
-                @if($role?->canManagePricing())
-                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Catalog</p>
+                {{-- SERVICES --}}
+                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Services</p>
 
+                <a href="{{ route('admin.services.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.services.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                    </svg>
+                    Services
+                </a>
+
+                <a href="{{ route('admin.orders.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.orders.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Orders
+                </a>
+
+                @if($role?->canManagePricing())
                 <a href="{{ route('admin.pricing') }}"
                    class="nav-link {{ request()->routeIs('admin.pricing') ? 'active' : '' }}">
                     <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,19 +161,52 @@
                     </svg>
                     Pricing
                 </a>
-                @endif
 
-                @if($role?->canManageTickets())
-                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Support</p>
-
-                <a href="{{ route('admin.tickets.index') }}"
-                   class="nav-link {{ request()->routeIs('admin.tickets.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.products.index', 'vps') }}"
+                   class="nav-link {{ request()->routeIs('admin.products.*') ? 'active' : '' }}">
                     <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
-                    Support Tickets
+                    Products
                 </a>
+                @endif
+
+                {{-- BILLING --}}
+                @if($role?->canManagePricing())
+                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Billing</p>
+
+                <a href="{{ route('admin.invoices.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.invoices.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                    </svg>
+                    Invoices
+                </a>
+
+                <a href="{{ route('admin.transactions.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.transactions.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                    </svg>
+                    Transactions
+                </a>
+
+                <a href="{{ route('admin.billing-settings') }}"
+                   class="nav-link {{ request()->routeIs('admin.billing-settings') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Billing Settings
+                </a>
+                @endif
+
+                {{-- CLIENTS & SUPPORT --}}
+                @if($role?->canManageTickets())
+                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Clients & Support</p>
 
                 <a href="{{ route('admin.clients.index') }}"
                    class="nav-link {{ request()->routeIs('admin.clients.*') ? 'active' : '' }}">
@@ -164,8 +216,30 @@
                     </svg>
                     Clients
                 </a>
+
+                <a href="{{ route('admin.tickets.index') }}"
+                   class="nav-link {{ request()->routeIs('admin.tickets.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    Support Tickets
+                </a>
                 @endif
 
+                {{-- COMMUNICATIONS --}}
+                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Communications</p>
+
+                <a href="{{ route('admin.communications.newsletter') }}"
+                   class="nav-link {{ request()->routeIs('admin.communications.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    Newsletter
+                </a>
+
+                {{-- SETTINGS --}}
                 <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Settings</p>
 
                 <a href="{{ route('admin.security') }}"
@@ -182,21 +256,12 @@
                    class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                     <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 100-8"/>
+                              d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     Admin Users
                 </a>
                 @endif
 
-                <p class="px-3 pt-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">External</p>
-
-                <a href="{{ rtrim(config('services.whmcs.url'), '/') }}/admin/" target="_blank" class="nav-link">
-                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                    </svg>
-                    WHMCS Admin
-                </a>
             </nav>
 
             {{-- Footer --}}

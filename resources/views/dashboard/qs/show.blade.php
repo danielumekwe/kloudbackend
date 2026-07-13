@@ -32,7 +32,7 @@
             <div>
                 <p class="text-sm font-medium text-slate-900 dark:text-white">Awaiting payment</p>
                 <p class="text-sm text-slate-600 dark:text-slate-400 mt-0.5">Your Quick Server will be provisioned automatically as soon as this invoice is paid.</p>
-                <a href="{{ route('billing.show', $order->whmcs_invoice_id) }}" class="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline mt-2 inline-block">View invoice →</a>
+                <a href="{{ route('billing.show', $order->invoice_id) }}" class="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline mt-2 inline-block">View invoice →</a>
             </div>
         </div>
     @elseif($order->status === 'failed')

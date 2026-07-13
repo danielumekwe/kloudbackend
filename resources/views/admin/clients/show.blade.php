@@ -57,8 +57,8 @@
             <p class="text-slate-700 dark:text-slate-300 mt-0.5">{{ $client->phonenumber ?: '—' }}</p>
         </div>
         <div>
-            <p class="text-xs text-slate-400">WHMCS linked</p>
-            <p class="text-slate-700 dark:text-slate-300 mt-0.5">{{ $client->whmcs_client_id ? 'Yes (#' . $client->whmcs_client_id . ')' : 'No' }}</p>
+            <p class="text-xs text-slate-400">Country</p>
+            <p class="text-slate-700 dark:text-slate-300 mt-0.5">{{ $client->country ?: '—' }}</p>
         </div>
     </div>
 
@@ -91,6 +91,60 @@
                     class="btn btn-danger text-sm"></button>
         </form>
         @endif
+    </div>
+</div>
+
+{{-- Add Credit --}}
+<div class="card mb-6" x-data="{ open: false }">
+    <button type="button" @click="open = !open" class="w-full flex items-center justify-between text-left">
+        <div>
+            <h3 class="font-semibold text-slate-900 dark:text-white">Add Credit</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Current balance: ${{ number_format((float) $client->credit_balance, 2) }}</p>
+        </div>
+        <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div x-show="open" x-transition class="mt-4">
+        <form method="POST" action="{{ route('admin.clients.add-credit', $client) }}" class="space-y-3">
+            @csrf
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="form-label">Amount (USD)</label>
+                    <input type="number" name="amount" step="0.01" min="0.01" max="10000"
+                           class="form-input" placeholder="e.g. 10.00" required>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="form-label">Note (optional)</label>
+                    <input type="text" name="note" class="form-input" placeholder="Reason for credit...">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-success text-sm">Add Credit</button>
+        </form>
+    </div>
+</div>
+
+{{-- Send Email to Client --}}
+<div class="card mb-6" x-data="{ open: false }">
+    <button type="button" @click="open = !open" class="w-full flex items-center justify-between text-left">
+        <h3 class="font-semibold text-slate-900 dark:text-white">Send Email to Client</h3>
+        <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div x-show="open" x-transition class="mt-4">
+        <form method="POST" action="{{ route('admin.clients.send-email', $client) }}" class="space-y-3">
+            @csrf
+            <div>
+                <label class="form-label">Subject</label>
+                <input type="text" name="subject" class="form-input" required maxlength="200">
+            </div>
+            <div>
+                <label class="form-label">Message</label>
+                <textarea name="body" class="form-input" rows="6" required maxlength="5000"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary text-sm">Send Email</button>
+        </form>
     </div>
 </div>
 
@@ -151,6 +205,103 @@
             <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
     </form>
+</div>
+
+{{-- Invoices --}}
+<div class="card mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-slate-900 dark:text-white">Invoices</h3>
+        <a href="{{ route('admin.invoices.index') }}?client={{ $client->id }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View all →</a>
+    </div>
+    @if($invoices->isEmpty())
+    <p class="text-sm text-slate-500 dark:text-slate-400">No invoices yet.</p>
+    @else
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($invoices->take(10) as $invoice)
+                @php
+                    $badgeClass = match($invoice->status) {
+                        'paid'      => 'badge-active',
+                        'unpaid'    => 'badge-open',
+                        'cancelled' => 'badge-closed',
+                        default     => 'badge-open',
+                    };
+                @endphp
+                <tr>
+                    <td><span class="font-mono text-xs font-medium text-slate-600 dark:text-slate-300">#{{ $invoice->id }}</span></td>
+                    <td class="font-medium text-slate-900 dark:text-white">{{ $invoice->currency_code }} {{ number_format((float)$invoice->total, 2) }}</td>
+                    <td><span class="badge {{ $badgeClass }}">{{ $invoice->status }}</span></td>
+                    <td class="text-slate-500 dark:text-slate-400 text-sm">{{ $invoice->created_at->format('M j, Y') }}</td>
+                    <td>
+                        <a href="{{ route('admin.invoices.show', $invoice->id) }}"
+                           class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">View →</a>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endif
+</div>
+
+{{-- Orders --}}
+<div class="card mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-slate-900 dark:text-white">Orders</h3>
+        <a href="{{ route('admin.orders.index') }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View all →</a>
+    </div>
+    @if($orders->isEmpty())
+    <p class="text-sm text-slate-500 dark:text-slate-400">No orders yet.</p>
+    @else
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($orders->take(10) as $order)
+                @php
+                    $badgeClass = match($order['status']) {
+                        'provisioned'  => 'badge-active',
+                        'provisioning' => 'badge-answered',
+                        'pending'      => 'badge-open',
+                        'failed'       => 'badge-suspended',
+                        'cancelled'    => 'badge-closed',
+                        default        => 'badge-open',
+                    };
+                @endphp
+                <tr>
+                    <td>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/[0.08] text-slate-600 dark:text-slate-300">
+                            {{ $order['type'] }}
+                        </span>
+                    </td>
+                    <td class="font-medium text-slate-700 dark:text-slate-300">{{ $order['desc'] }}</td>
+                    <td class="text-slate-700 dark:text-slate-300">${{ number_format((float)$order['price'], 2) }}</td>
+                    <td><span class="badge {{ $badgeClass }}">{{ $order['status'] }}</span></td>
+                    <td class="text-slate-500 dark:text-slate-400 text-sm">{{ $order['created_at']?->format('M j, Y') }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endif
 </div>
 
 {{-- Tickets --}}

@@ -496,6 +496,56 @@
                         </svg>
                     </button>
 
+                    {{-- Cart — quick access to unpaid invoices --}}
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open"
+                                class="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors"
+                                title="Cart">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m-10 0a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z"/>
+                            </svg>
+                            @if($cartInvoices->isNotEmpty())
+                            <span class="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                {{ $cartInvoices->count() }}
+                            </span>
+                            @endif
+                        </button>
+
+                        <div x-show="open"
+                             @click.outside="open = false"
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 scale-100"
+                             x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-800 rounded-xl shadow-xl
+                                    border border-slate-200 dark:border-white/[0.08] py-2 z-10 origin-top-right">
+                            <div class="px-4 pb-2 flex items-center justify-between border-b border-slate-100 dark:border-white/[0.06]">
+                                <span class="text-sm font-semibold text-slate-900 dark:text-white">Your Cart</span>
+                                <span class="text-xs text-slate-400">{{ $cartInvoices->count() }} unpaid</span>
+                            </div>
+                            @if($cartInvoices->isEmpty())
+                                <p class="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">No unpaid invoices right now.</p>
+                            @else
+                                <div class="max-h-72 overflow-y-auto">
+                                    @foreach($cartInvoices as $cartInvoice)
+                                    <a href="{{ route('billing.show', $cartInvoice->id) }}"
+                                       class="flex items-center justify-between gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors">
+                                        <span class="text-slate-700 dark:text-slate-300">Invoice #{{ $cartInvoice->id }}</span>
+                                        <span class="font-semibold text-slate-900 dark:text-white">
+                                            {{ \App\Support\CurrencyConverter::format((float) $cartInvoice->total, $cartInvoice->currency_code) }}
+                                        </span>
+                                    </a>
+                                    @endforeach
+                                </div>
+                                <div class="px-4 pt-2">
+                                    <a href="{{ route('billing.index') }}" class="btn btn-primary w-full justify-center text-sm">Checkout</a>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
                     {{-- Currency switcher --}}
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open"

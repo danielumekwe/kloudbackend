@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\DomainRenewal;
+use App\Models\Invoice;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -14,14 +14,14 @@ use Illuminate\Support\Facades\Log;
 #[Description('Check pending domain renewal invoices for payment and submit the renewal to InterServer')]
 class ProvisionPaidDomainRenewal extends Command
 {
-    public function handle(WhmcsService $whmcs, InterServerService $interserver): int
+    public function handle(InterServerService $interserver): int
     {
         $pending = DomainRenewal::where('status', 'pending_payment')->with('domainOrder')->get();
 
         foreach ($pending as $renewal) {
-            $invoice = $whmcs->getInvoice($renewal->whmcs_invoice_id);
+            $invoice = Invoice::find($renewal->invoice_id);
 
-            if (($invoice['status'] ?? '') !== 'Paid') {
+            if (! $invoice || $invoice->status !== 'paid') {
                 continue;
             }
 

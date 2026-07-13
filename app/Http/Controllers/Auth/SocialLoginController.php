@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Services\WhmcsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Laravel\Socialite\Facades\Socialite;
@@ -17,8 +15,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class SocialLoginController extends Controller
 {
     private const PROVIDERS = ['google', 'facebook'];
-
-    public function __construct(private WhmcsService $whmcs) {}
 
     public function redirect(string $provider): RedirectResponse
     {
@@ -91,9 +87,8 @@ class SocialLoginController extends Controller
             'phonenumber' => ['required', 'string', 'max:30'],
         ]);
 
-        // No password from the social provider — generate a throwaway one. It's
-        // never used for real login (this account only ever signs in via OAuth),
-        // and the same value is reused for the WHMCS shadow client below.
+        // No password from the social provider — generate a throwaway one. Never
+        // used for real login; this account only ever signs in via OAuth.
         $generatedPassword = Str::password(20);
 
         $client = Client::create([
@@ -108,8 +103,6 @@ class SocialLoginController extends Controller
             'country'     => strtoupper($request->country),
             'phonenumber' => $request->phonenumber,
         ]);
-
-        $this->createShadowWhmcsClient($client, $generatedPassword);
 
         session()->forget('social_pending');
         $this->logIn($client);
@@ -133,39 +126,6 @@ class SocialLoginController extends Controller
             'lastName'  => $client->lastname,
             'email'     => $client->email,
         ]);
-    }
-
-    /**
-     * Best-effort — see RegisterController::createShadowWhmcsClient() for the full
-     * rationale (invoicing is still WHMCS-backed until Phase 3 of the WHMCS exit;
-     * never blocks account creation; whmcs_client_id is intentionally separate from
-     * the local id since WHMCS assigns its own).
-     */
-    private function createShadowWhmcsClient(Client $client, string $password): void
-    {
-        $result = $this->whmcs->addClient([
-            'firstname'   => $client->firstname,
-            'lastname'    => $client->lastname,
-            'email'       => $client->email,
-            'password2'   => $password,
-            'address1'    => $client->address1,
-            'city'        => $client->city,
-            'state'       => $client->state,
-            'postcode'    => $client->postcode,
-            'country'     => $client->country,
-            'phonenumber' => $client->phonenumber,
-        ]);
-
-        if (($result['result'] ?? '') !== 'success') {
-            Log::error('Failed to create shadow WHMCS client during social registration — invoicing for this client will fail until this is resolved manually.', [
-                'client_id' => $client->id,
-                'email' => $client->email,
-                'result' => $result,
-            ]);
-            return;
-        }
-
-        $client->update(['whmcs_client_id' => (int) $result['clientid']]);
     }
 
     private function splitName(string $name): array

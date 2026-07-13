@@ -7,9 +7,10 @@ use App\Mail\OrderConfirmationMail;
 use App\Models\Client;
 use App\Models\SslOrder;
 use App\Services\InterServerService;
-use App\Services\WhmcsService;
+use App\Services\InvoiceService;
 use App\Support\CurrencyConverter;
 use App\Support\PricingConfig;
+use App\Support\ProductCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class SslController extends Controller
 {
     public function __construct(
         private InterServerService $interserver,
-        private WhmcsService $whmcs,
+        private InvoiceService $invoices,
     ) {}
 
     /**
@@ -68,9 +69,12 @@ class SslController extends Controller
         $currency     = CurrencyConverter::symbol($currencyCode);
 
         $prices = $packages->mapWithKeys(fn ($p) => [
-            $p['services_id'] => CurrencyConverter::convertFromUsd(
-                $this->computePrice((int) $p['services_id'], (float) $p['services_cost'], 12),
+            $p['services_id'] => ProductCatalog::price(
+                'ssl',
+                (string) $p['services_id'],
+                12,
                 $currencyCode,
+                $this->computePrice((int) $p['services_id'], (float) $p['services_cost'], 12),
             ),
         ]);
 
@@ -114,7 +118,7 @@ class SslController extends Controller
         }
 
         $priceUsd = $this->computePrice($validated['package_id'], (float) $cost, $validated['frequency']);
-        $price    = CurrencyConverter::convertFromUsd($priceUsd, session('currency', 'USD'));
+        $price    = ProductCatalog::price('ssl', (string) $validated['package_id'], (int) $validated['frequency'], session('currency', 'USD'), $priceUsd);
 
         return response()->json(['price' => $price]);
     }
@@ -166,42 +170,20 @@ class SslController extends Controller
         $priceUsd = $this->computePrice($validated['package_id'], (float) $cost, $validated['frequency']);
 
         $currencyCode = session('currency', 'USD');
-        $currencyRate = CurrencyConverter::refreshFresh($currencyCode);
-        $price        = round($priceUsd * $currencyRate, 2);
-
-        // ensureClientCurrency/createInvoice are WHMCS-bound and must resolve through
-        // whmcs_client_id, never the local id directly — they only coincide for
-        // clients migrated before the WHMCS exit (see the migration plan).
+        $price = ProductCatalog::price('ssl', (string) $validated['package_id'], (int) $validated['frequency'], $currencyCode, $priceUsd);
         $client = Client::find($clientId);
-        $whmcsClientId = $client?->whmcs_client_id;
-
-        if (! $whmcsClientId) {
-            return back()->with('error', 'We\'re still setting up your billing account. Please try again shortly or contact support.')->withInput();
-        }
-
-        if (! CurrencyConverter::ensureClientCurrency($whmcsClientId, $currencyCode)) {
-            return back()->with('error', 'Could not switch your billing currency. Please try again or contact support.')->withInput();
-        }
 
         $orderDescription = "SSL Certificate — {$packageName} — {$validated['hostname']}";
 
-        $invoice = $this->whmcs->createInvoice(
-            $whmcsClientId,
-            $orderDescription,
-            $price,
-        );
-
-        if (($invoice['result'] ?? '') !== 'success') {
-            return back()->with('error', 'Could not create your invoice. Please contact support.')->withInput();
-        }
+        $invoice = $this->invoices->createAt($client, $orderDescription, $price, $currencyCode);
 
         SslOrder::create([
-            'client_id'        => $clientId,
-            'whmcs_invoice_id' => $invoice['invoiceid'],
-            'status'           => 'pending_payment',
-            'price'            => $price,
-            'billing_cycle'    => $validated['frequency'],
-            'config'           => array_merge($orderConfig, [
+            'client_id'     => $clientId,
+            'invoice_id'    => $invoice->id,
+            'status'        => 'pending_payment',
+            'price'         => $invoice->total,
+            'billing_cycle' => $validated['frequency'],
+            'config'        => array_merge($orderConfig, [
                 'package_id' => $validated['package_id'],
                 'currency'   => $currencyCode,
                 'amount_usd' => $priceUsd,
@@ -211,12 +193,12 @@ class SslController extends Controller
         Mail::to($client->email)->send(new OrderConfirmationMail(
             $client->firstname,
             $orderDescription,
-            $price,
+            $invoice->total,
             $currencyCode,
-            $invoice['invoiceid'],
+            $invoice->id,
         ));
 
-        return redirect()->route('billing.show', $invoice['invoiceid'])
+        return redirect()->route('billing.show', $invoice->id)
             ->with('success', 'Your order has been created. Your certificate will be issued automatically as soon as this invoice is paid.');
     }
 

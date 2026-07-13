@@ -8,7 +8,7 @@ class DomainRenewal extends Model
 {
     protected $fillable = [
         'domain_order_id',
-        'whmcs_invoice_id',
+        'invoice_id',
         'years',
         'price',
         'status',

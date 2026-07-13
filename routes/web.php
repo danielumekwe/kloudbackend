@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\AdminClientController;
 use App\Http\Controllers\Admin\AdminInvoicesController;
 use App\Http\Controllers\Admin\AdminOrdersController;
 use App\Http\Controllers\Admin\AdminPricingController;
+use App\Http\Controllers\Admin\AdminProductsController;
 use App\Http\Controllers\Admin\AdminServicesController;
 use App\Http\Controllers\Admin\AdminTicketController;
 use App\Http\Controllers\Admin\AdminTransactionsController;
@@ -257,6 +258,13 @@ Route::prefix('admin')->group(function () {
         Route::middleware('admin.role:super_admin,finance_manager')->group(function () {
             Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
             Route::post('/pricing', [AdminPricingController::class, 'update'])->name('admin.pricing.update');
+
+            Route::prefix('products')->where(['type' => 'vps|qs|ssl|domain'])->group(function () {
+                Route::get('/{type}',              [AdminProductsController::class, 'index'])->name('admin.products.index');
+                Route::get('/{type}/{key}/edit',   [AdminProductsController::class, 'edit'])->name('admin.products.edit');
+                Route::post('/{type}/{key}/details', [AdminProductsController::class, 'updateDetails'])->name('admin.products.details');
+                Route::post('/{type}/{key}/pricing', [AdminProductsController::class, 'updatePricing'])->name('admin.products.pricing');
+            });
 
             Route::get('/billing-settings',  [AdminBillingSettingsController::class, 'index'])->name('admin.billing-settings');
             Route::post('/billing-settings', [AdminBillingSettingsController::class, 'update'])->name('admin.billing-settings.update');
