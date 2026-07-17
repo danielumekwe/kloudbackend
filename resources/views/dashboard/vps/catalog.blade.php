@@ -68,6 +68,7 @@
         <input type="hidden" name="location"    :value="location">
         <input type="hidden" name="period"      :value="period">
         <input type="hidden" name="controlpanel" :value="controlpanel">
+        <input type="hidden" name="slices"      :value="slices">
 
         {{-- ── 1. Choose Location ──────────────────────────────────────── --}}
         <div class="card p-0 overflow-hidden">
