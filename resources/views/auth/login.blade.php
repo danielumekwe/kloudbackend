@@ -30,6 +30,38 @@
 </div>
 @endif
 
+{{-- Social login --}}
+<div class="space-y-3">
+    <a href="{{ route('social.redirect', 'google') }}"
+       class="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-white/[0.08]
+              bg-white dark:bg-white/[0.03] text-sm font-semibold text-slate-700 dark:text-slate-200
+              hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors">
+        <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v2.97h3.86c2.26-2.09 3.56-5.17 3.56-8.79z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-2.97c-1.07.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.27v3.07C3.26 21.3 7.31 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.27 14.32A7.18 7.18 0 014.9 12c0-.81.14-1.6.37-2.32V6.61H1.27A11.96 11.96 0 000 12c0 1.93.46 3.76 1.27 5.39l4-3.07z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.94 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.27 6.61l4 3.07C6.22 6.86 8.87 4.75 12 4.75z"/>
+        </svg>
+        Sign in with Google
+    </a>
+    <a href="{{ route('social.redirect', 'facebook') }}"
+       class="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-white/[0.08]
+              bg-white dark:bg-white/[0.03] text-sm font-semibold text-slate-700 dark:text-slate-200
+              hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors">
+        <svg class="w-4 h-4" fill="#1877F2" viewBox="0 0 24 24">
+            <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.02 4.39 11.02 10.13 11.93v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.95h-1.51c-1.49 0-1.95.93-1.95 1.89v2.27h3.32l-.53 3.49h-2.79v8.44C19.61 23.09 24 18.09 24 12.07z"/>
+        </svg>
+        Sign in with Facebook
+    </a>
+</div>
+
+{{-- Divider --}}
+<div class="flex items-center gap-3 my-6">
+    <div class="h-px flex-1 bg-slate-200 dark:bg-white/[0.08]"></div>
+    <span class="text-xs text-slate-400 dark:text-slate-500">or sign in with email</span>
+    <div class="h-px flex-1 bg-slate-200 dark:bg-white/[0.08]"></div>
+</div>
+
 <form method="POST" action="{{ route('login') }}" x-data="{ loading: false }" @submit="loading = true">
     @csrf
 
@@ -96,38 +128,6 @@
         </button>
     </div>
 </form>
-
-{{-- Divider --}}
-<div class="flex items-center gap-3 my-6">
-    <div class="h-px flex-1 bg-slate-200 dark:bg-white/[0.08]"></div>
-    <span class="text-xs text-slate-400 dark:text-slate-500">or continue with</span>
-    <div class="h-px flex-1 bg-slate-200 dark:bg-white/[0.08]"></div>
-</div>
-
-{{-- Social login --}}
-<div class="grid grid-cols-2 gap-3">
-    <a href="{{ route('social.redirect', 'google') }}"
-       class="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-white/[0.08]
-              bg-white dark:bg-white/[0.03] text-sm font-semibold text-slate-700 dark:text-slate-200
-              hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors">
-        <svg class="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v2.97h3.86c2.26-2.09 3.56-5.17 3.56-8.79z"/>
-            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-2.97c-1.07.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.27v3.07C3.26 21.3 7.31 24 12 24z"/>
-            <path fill="#FBBC05" d="M5.27 14.32A7.18 7.18 0 014.9 12c0-.81.14-1.6.37-2.32V6.61H1.27A11.96 11.96 0 000 12c0 1.93.46 3.76 1.27 5.39l4-3.07z"/>
-            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.94 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.27 6.61l4 3.07C6.22 6.86 8.87 4.75 12 4.75z"/>
-        </svg>
-        Google
-    </a>
-    <a href="{{ route('social.redirect', 'facebook') }}"
-       class="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-white/[0.08]
-              bg-white dark:bg-white/[0.03] text-sm font-semibold text-slate-700 dark:text-slate-200
-              hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors">
-        <svg class="w-4 h-4" fill="#1877F2" viewBox="0 0 24 24">
-            <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.02 4.39 11.02 10.13 11.93v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.95h-1.51c-1.49 0-1.95.93-1.95 1.89v2.27h3.32l-.53 3.49h-2.79v8.44C19.61 23.09 24 18.09 24 12.07z"/>
-        </svg>
-        Facebook
-    </a>
-</div>
 
 <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
     Don't have an account?

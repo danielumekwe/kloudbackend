@@ -64,6 +64,8 @@ Route::middleware('guest')->group(function () {
     Route::post('/login',    [LoginController::class,    'login'])->middleware('throttle:6,1');
     Route::get('/register',  [RegisterController::class, 'show'])->name('register');
     Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:6,1');
+    Route::get('/register/complete',  [RegisterController::class, 'showComplete'])->name('register.complete');
+    Route::post('/register/complete', [RegisterController::class, 'storeComplete'])->name('register.complete.store')->middleware('throttle:6,1');
 
     // Forgot / reset password
     Route::get('/password/forgot',      [PasswordResetController::class, 'showForgot'])->name('password.request');
