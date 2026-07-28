@@ -1,0 +1,61 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload built assets to staging path
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "public/build/*"
+          target: "/home/my/laravel-app/public/build_incoming"
+          strip_components: 2
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/my/laravel-app
+
+            git fetch origin main
+            git merge --ff-only origin/main
+
+            composer install --no-interaction --prefer-dist --optimize-autoloader
+
+            rm -rf public/build
+            mv public/build_incoming public/build
+
+            php artisan migrate --force
+            php artisan route:clear
+            php artisan route:cache
+            php artisan view:clear
+            php artisan config:clear
