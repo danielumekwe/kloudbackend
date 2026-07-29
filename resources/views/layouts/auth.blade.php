@@ -26,14 +26,8 @@
 
     {{-- Header --}}
     <header class="relative z-10 flex items-center justify-between px-6 py-5 lg:px-10">
-        <a href="{{ route('login') }}" class="flex items-center gap-2.5">
-            <div class="inline-flex items-center justify-center w-9 h-9 rounded-xl
-                        bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg shadow-blue-500/30 p-1.5">
-                <img src="/images/kloud101-icon.png" alt="Kloud101" class="w-full h-full object-contain">
-            </div>
-            <span class="text-lg font-bold">
-                <span class="text-slate-900 dark:text-white">kloud</span><span class="text-blue-600 dark:text-blue-400">101</span>
-            </span>
+        <a href="{{ route('login') }}" class="flex items-center">
+            <img src="/images/kloud101-logo.png" alt="Kloud101" class="h-10 w-auto bg-white rounded-lg px-2.5 py-1.5 shadow-sm">
         </a>
 
         <div class="flex items-center gap-3">
