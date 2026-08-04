@@ -110,8 +110,8 @@
             <span class="text-sm text-slate-500 dark:text-slate-400">Total due</span>
             <span class="text-2xl font-bold text-slate-900 dark:text-white">
                 <template x-if="quoting"><span class="text-sm text-slate-400">calculating…</span></template>
-                <template x-if="!quoting && price !== null">{{ $currency }}<span x-text="price.toFixed(2)"></span></template>
-                <template x-if="!quoting && price === null">—</template>
+                <template x-if="!quoting && price !== null"><span>{{ $currency }}<span x-text="price.toFixed(2)"></span></span></template>
+                <template x-if="!quoting && price === null"><span>—</span></template>
             </span>
         </div>
     </div>

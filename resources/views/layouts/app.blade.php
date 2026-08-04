@@ -144,6 +144,15 @@
                     My Quick Servers
                 </a>
 
+                <a href="{{ route('dedicated.index') }}"
+                   class="nav-link {{ request()->routeIs('dedicated.*') ? 'active' : '' }}">
+                    <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    My Dedicated Servers
+                </a>
+
                 <a href="{{ route('servers.index') }}"
                    class="nav-link {{ request()->routeIs('servers.*') ? 'active' : '' }}">
                     <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,7 +185,7 @@
                 <div x-data="{ openGroup: '{{
                     request()->routeIs('vps.catalog') ? 'vps'
                     : (request()->routeIs('qs.catalog') ? 'quickservers'
-                    : (request()->is('coming-soon/dedicated-server') || request()->is('coming-soon/managed-dedicated-server') ? 'server'
+                    : (request()->routeIs('dedicated.catalog') || request()->is('coming-soon/managed-dedicated-server') ? 'server'
                     : (request()->routeIs('ssl.catalog') ? 'ssl'
 
                     : (request()->routeIs('domains.search') || request()->routeIs('domains.catalog') ? 'domains' : ''))))
@@ -238,7 +247,7 @@
 
                     {{-- Server --}}
                     <button type="button" @click="openGroup = openGroup === 'server' ? '' : 'server'"
-                            class="nav-link w-full justify-between {{ request()->is('coming-soon/dedicated-server') || request()->is('coming-soon/managed-dedicated-server') ? 'active' : '' }}">
+                            class="nav-link w-full justify-between {{ request()->routeIs('dedicated.catalog') || request()->is('coming-soon/managed-dedicated-server') ? 'active' : '' }}">
                         <span class="flex items-center gap-3">
                             <svg class="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -251,7 +260,8 @@
                         </svg>
                     </button>
                     <div x-show="openGroup === 'server'" class="space-y-0.5">
-                        <a href="{{ route('coming-soon', 'dedicated-server') }}" class="nav-link pl-11">Dedicated Server</a>
+                        <a href="{{ route('dedicated.catalog') }}"
+                           class="nav-link pl-11 {{ request()->routeIs('dedicated.catalog') ? 'active' : '' }}">Dedicated Server</a>
                         <a href="{{ route('coming-soon', 'managed-dedicated-server') }}" class="nav-link pl-11">Managed Dedicated Server</a>
                     </div>
 
@@ -431,7 +441,7 @@
                                 </svg>
                                 Quick Servers
                             </a>
-                            <a href="{{ route('coming-soon', 'dedicated-server') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors">
+                            <a href="{{ route('dedicated.catalog') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors">
                                 <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>

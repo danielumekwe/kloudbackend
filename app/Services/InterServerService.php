@@ -19,9 +19,16 @@ class InterServerService
     private function request(string $method, string $path, array $data = []): array
     {
         try {
-            $response = Http::withHeaders(['X-API-KEY' => $this->apiKey])
-                ->timeout(30)
-                ->{$method}($this->baseUrl . $path, $data);
+            $pending = Http::withHeaders(['X-API-KEY' => $this->apiKey])->timeout(30);
+
+            // Passing an empty array explicitly (2 args) makes Laravel set the Guzzle
+            // "query" option to [], which *replaces* — rather than leaves alone — any
+            // query string already embedded in $path (e.g. "?a=123" built via
+            // http_build_query for GET requests). Omitting the arg entirely when there's
+            // no data keeps that embedded query string intact.
+            $response = $data === []
+                ? $pending->{$method}($this->baseUrl . $path)
+                : $pending->{$method}($this->baseUrl . $path, $data);
 
             if (! $response->successful()) {
                 Log::error("InterServer API HTTP error [{$method} {$path}]", [
@@ -616,6 +623,58 @@ class InterServerService
     public function getQsWelcomeEmail(int $id): array
     {
         return $this->request('get', "/qs/{$id}/welcome_email");
+    }
+
+    // ===========================================================================
+    // Dedicated Servers (bare metal, ordered via the Rapid Deploy / Buy-It-Now
+    // marketplace — a curated inventory of pre-built physical servers, distinct
+    // from Quick Servers' own master pool above)
+    // ===========================================================================
+
+    public function listServers(): array
+    {
+        $result = $this->request('get', '/servers');
+        return is_array($result) && ! ($result['error'] ?? false) ? $result : [];
+    }
+
+    public function getServer(int $id): array
+    {
+        return $this->request('get', "/servers/{$id}");
+    }
+
+    public function cancelServer(int $id): array
+    {
+        return $this->request('delete', "/servers/{$id}");
+    }
+
+    public function getServerInvoices(int $id): array
+    {
+        return $this->request('get', "/servers/{$id}/invoices");
+    }
+
+    /**
+     * Live Rapid Deploy / Buy-It-Now inventory — pre-built dedicated servers ready
+     * for immediate provisioning. Public endpoint (no auth required upstream), but
+     * routed through our own API key like everything else for consistency.
+     */
+    public function getMarketplaceServers(): array
+    {
+        $result = $this->request('get', '/buy_now_servers_list');
+        return is_array($result) && ! ($result['error'] ?? false) ? $result : [];
+    }
+
+    /**
+     * Configurable options (bandwidth/OS/control panel/RAID/region) for one
+     * marketplace asset. Feed the returned option ids into placeBuyNowOrder().
+     */
+    public function getBuyNowOptions(int $assetId): array
+    {
+        return $this->request('get', '/servers/order/buy_now_server?' . http_build_query(['a' => $assetId]));
+    }
+
+    public function placeBuyNowOrder(int $assetId, array $data): array
+    {
+        return $this->request('post', '/servers/order/buy_now_server?' . http_build_query(['a' => $assetId]), $data);
     }
 
     // ===========================================================================

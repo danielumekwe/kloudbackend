@@ -18,7 +18,7 @@ use Illuminate\View\View;
  */
 class AdminProductsController extends Controller
 {
-    private const TYPES = ['vps', 'qs', 'ssl', 'domain'];
+    private const TYPES = ['vps', 'qs', 'ssl', 'domain', 'dedicated'];
 
     public function __construct(private InterServerService $interserver) {}
 
@@ -29,10 +29,11 @@ class AdminProductsController extends Controller
         $products = Product::query()->where('type', $type)->get()->keyBy('key');
 
         $items = match ($type) {
-            'vps'    => $this->vpsItems($products),
-            'qs'     => $this->qsItems($products),
-            'ssl'    => $this->sslItems($products),
-            'domain' => $this->domainItems($products),
+            'vps'       => $this->vpsItems($products),
+            'qs'        => $this->qsItems($products),
+            'ssl'       => $this->sslItems($products),
+            'domain'    => $this->domainItems($products),
+            'dedicated' => $this->dedicatedItems($products),
         };
 
         return view('admin.products.index', [
@@ -167,6 +168,22 @@ class AdminProductsController extends Controller
         ])->values()->all();
     }
 
+    private function dedicatedItems($products): array
+    {
+        $listings = $this->interserver->getMarketplaceServers();
+
+        return collect($listings)->map(function (array $listing) use ($products) {
+            $key = (string) $listing['server_id'];
+            $cpuLabel = is_array($listing['cpu'] ?? null) ? ($listing['cpu'][0] ?? "Dedicated Server #{$key}") : "Dedicated Server #{$key}";
+
+            return [
+                'key'   => $key,
+                'label' => $products[$key]->name ?? $cpuLabel,
+                'product' => $products[$key] ?? null,
+            ];
+        })->values()->all();
+    }
+
     private function defaultName(string $type, string $key): string
     {
         return match ($type) {
@@ -175,6 +192,11 @@ class AdminProductsController extends Controller
             'ssl'    => collect($this->interserver->getSslOrderCatalog()['serviceTypes'] ?? [])
                 ->firstWhere('services_id', $key)['services_name'] ?? "SSL Package #{$key}",
             'domain' => strtoupper($key),
+            'dedicated' => (function () use ($key) {
+                $listing = collect($this->interserver->getMarketplaceServers())->firstWhere('server_id', $key);
+                $cpu = is_array($listing['cpu'] ?? null) ? ($listing['cpu'][0] ?? null) : null;
+                return $cpu ?? "Dedicated Server #{$key}";
+            })(),
         };
     }
 
@@ -184,6 +206,7 @@ class AdminProductsController extends Controller
             'vps'    => collect(config('vps_pricing.period_months'))->map(fn ($p, $m) => ['months' => (int) $m, 'label' => $p['label']])->values()->all(),
             'ssl'    => collect(config('ssl_pricing.period_months'))->map(fn ($p, $m) => ['months' => (int) $m, 'label' => $p['label']])->values()->all(),
             'qs'     => [['months' => 1, 'label' => 'Monthly']],
+            'dedicated' => [['months' => 1, 'label' => 'Monthly']],
             'domain' => [
                 ['months' => 12, 'label' => '1 Year'],
                 ['months' => 24, 'label' => '2 Years'],

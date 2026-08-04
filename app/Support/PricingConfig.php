@@ -70,6 +70,16 @@ class PricingConfig
         return (float) PricingSetting::get("ssl.period_months.{$months}.discount", $default);
     }
 
+    public static function dedicatedMarkupPercent(): float
+    {
+        return (float) PricingSetting::get('dedicated.markup_percent', config('dedicated_pricing.markup_percent', 0));
+    }
+
+    public static function dedicatedServerOverrides(): array
+    {
+        return (array) PricingSetting::get('dedicated.server_overrides', config('dedicated_pricing.server_overrides', []));
+    }
+
     public static function domainsMarkupPercent(): float
     {
         return (float) PricingSetting::get('domains.markup_percent', config('domains_pricing.markup_percent', 0));

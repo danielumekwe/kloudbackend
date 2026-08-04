@@ -23,6 +23,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SocialLoginController;
 use App\Http\Controllers\Dashboard\BillingController;
 use App\Http\Controllers\Dashboard\CurrencyController;
+use App\Http\Controllers\Dashboard\DedicatedServerController;
 use App\Http\Controllers\Dashboard\DomainsController;
 use App\Http\Controllers\Dashboard\HomeController;
 use App\Http\Controllers\Dashboard\PaymentController;
@@ -120,6 +121,14 @@ Route::middleware('client.auth')->group(function () {
     Route::post('/qs/order',          [QsController::class, 'store'])->name('qs.store');
     Route::get('/qs/{order}',         [QsController::class, 'show'])->name('qs.show');
     Route::post('/qs/{order}/action', [QsController::class, 'action'])->name('qs.action');
+
+    // Dedicated Servers (InterServer-backed — Rapid Deploy / Buy-It-Now marketplace)
+    Route::get('/dedicated',                 [DedicatedServerController::class, 'index'])->name('dedicated.index');
+    Route::post('/dedicated/quote',           [DedicatedServerController::class, 'quote'])->name('dedicated.quote');
+    Route::get('/dedicated/order',            [DedicatedServerController::class, 'catalog'])->name('dedicated.catalog');
+    Route::post('/dedicated/order',           [DedicatedServerController::class, 'store'])->name('dedicated.store');
+    Route::get('/dedicated/{order}',          [DedicatedServerController::class, 'show'])->name('dedicated.show');
+    Route::post('/dedicated/{order}/action',  [DedicatedServerController::class, 'action'])->name('dedicated.action');
 
     // SSL Certificates (InterServer-backed)
     Route::get('/ssl',                 [SslController::class, 'index'])->name('ssl.index');
@@ -261,7 +270,7 @@ Route::prefix('admin')->group(function () {
             Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
             Route::post('/pricing', [AdminPricingController::class, 'update'])->name('admin.pricing.update');
 
-            Route::prefix('products')->where(['type' => 'vps|qs|ssl|domain'])->group(function () {
+            Route::prefix('products')->where(['type' => 'vps|qs|ssl|domain|dedicated'])->group(function () {
                 Route::get('/{type}',              [AdminProductsController::class, 'index'])->name('admin.products.index');
                 Route::get('/{type}/{key}/edit',   [AdminProductsController::class, 'edit'])->name('admin.products.edit');
                 Route::post('/{type}/{key}/details', [AdminProductsController::class, 'updateDetails'])->name('admin.products.details');

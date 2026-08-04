@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('vps:provision-paid')->everyFiveMinutes();
 Schedule::command('qs:provision-paid')->everyFiveMinutes();
+Schedule::command('dedicated:provision-paid')->everyFiveMinutes();
 Schedule::command('ssl:provision-paid')->everyFiveMinutes();
 Schedule::command('domains:provision-paid')->everyFiveMinutes();
 Schedule::command('domains:provision-paid-renewal')->everyFiveMinutes();

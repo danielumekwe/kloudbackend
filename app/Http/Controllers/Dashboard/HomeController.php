@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\DedicatedServerOrder;
 use App\Models\DomainOrder;
 use App\Models\Invoice;
 use App\Models\LoginActivity;
@@ -41,7 +42,8 @@ class HomeController extends Controller
         $vpsActive     = VpsOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
         $qsActive      = QsOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
         $sslActive     = SslOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
-        $domainsActive = DomainOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
+        $domainsActive    = DomainOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
+        $dedicatedActive  = DedicatedServerOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
 
         $recentActivity = LoginActivity::where('client_id', $clientId)->latest()->take(5)->get();
 
@@ -58,6 +60,7 @@ class HomeController extends Controller
             'qsActive',
             'sslActive',
             'domainsActive',
+            'dedicatedActive',
             'recentActivity',
         ));
     }

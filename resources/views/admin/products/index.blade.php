@@ -20,7 +20,7 @@
 
 {{-- Type tabs --}}
 <div class="flex gap-1 mb-6 border-b border-slate-200 dark:border-white/[0.06]">
-    @foreach(['vps' => 'VPS', 'qs' => 'Quick Servers', 'ssl' => 'SSL', 'domain' => 'Domains'] as $t => $label)
+    @foreach(['vps' => 'VPS', 'qs' => 'Quick Servers', 'dedicated' => 'Dedicated Servers', 'ssl' => 'SSL', 'domain' => 'Domains'] as $t => $label)
     <a href="{{ route('admin.products.index', $t) }}"
        class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
               {{ $type === $t

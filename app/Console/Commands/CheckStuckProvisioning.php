@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\DedicatedServerOrder;
 use App\Models\DomainOrder;
 use App\Models\DomainRenewal;
 use App\Models\QsOrder;
@@ -30,6 +31,7 @@ class CheckStuckProvisioning extends Command
         VpsOrder::class,
         QsOrder::class,
         SslOrder::class,
+        DedicatedServerOrder::class,
     ];
 
     public function handle(): int
