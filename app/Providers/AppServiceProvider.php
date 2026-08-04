@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Mail\Transport\ZeptoMailApiTransport;
 use App\Models\Invoice;
 use App\Support\CurrencyConverter;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +24,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Mail::extend('zeptomail-api', function (array $config = []) {
+            return new ZeptoMailApiTransport($config['token'] ?? config('services.zeptomail.token'));
+        });
+
         View::composer('layouts.app', function ($view) {
             $view->with('availableCurrencies', CurrencyConverter::available());
 

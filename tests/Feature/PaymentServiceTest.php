@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Mail\InvoicePaidMail;
+use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\PaymentTransaction;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class PaymentServiceTest extends TestCase
@@ -138,5 +142,51 @@ class PaymentServiceTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertDatabaseCount('payment_transactions', 0);
+    }
+
+    public function test_sends_invoice_paid_email_to_the_client(): void
+    {
+        Mail::fake();
+        $client = Client::create([
+            'email' => 'jane@example.com',
+            'password' => Hash::make('password123'),
+            'firstname' => 'Jane',
+            'lastname' => 'Doe',
+        ]);
+        $invoice = $this->makeInvoice(['client_id' => $client->id]);
+
+        app(PaymentService::class)->recordPayment(
+            invoiceId: $invoice->id,
+            clientId: $client->id,
+            gateway: 'paystack',
+            reference: 'ref-1',
+            amount: 5000.00,
+            currency: 'NGN',
+        );
+
+        Mail::assertQueued(InvoicePaidMail::class, fn ($mail) => $mail->hasTo($client->email) && $mail->invoiceId === $invoice->id);
+    }
+
+    public function test_does_not_send_invoice_paid_email_for_a_duplicate_payment(): void
+    {
+        Mail::fake();
+        $client = Client::create([
+            'email' => 'jane@example.com',
+            'password' => Hash::make('password123'),
+            'firstname' => 'Jane',
+            'lastname' => 'Doe',
+        ]);
+        $invoice = $this->makeInvoice(['client_id' => $client->id, 'status' => 'paid']);
+
+        app(PaymentService::class)->recordPayment(
+            invoiceId: $invoice->id,
+            clientId: $client->id,
+            gateway: 'paystack',
+            reference: 'ref-1',
+            amount: 5000.00,
+            currency: 'NGN',
+        );
+
+        Mail::assertNotQueued(InvoicePaidMail::class);
     }
 }

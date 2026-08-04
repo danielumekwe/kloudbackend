@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Mail\InvoicePaidMail;
+use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\PaymentTransaction;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * The single choke point every gateway (Paystack/Flutterwave/NOWPayments) funnels
@@ -82,6 +85,16 @@ class PaymentService
             'paid_at'        => now(),
             'payment_method' => $gateway,
         ]);
+
+        if ($client = Client::find($clientId)) {
+            Mail::to($client->email)->send(new InvoicePaidMail(
+                firstName: $client->firstname,
+                invoiceId: $invoice->id,
+                amount: (float) $invoice->total,
+                currency: $invoice->currency_code,
+                paidAt: $invoice->paid_at->format('M j, Y \a\t g:i A'),
+            ));
+        }
 
         return ['success' => true, 'message' => 'Payment recorded.'];
     }

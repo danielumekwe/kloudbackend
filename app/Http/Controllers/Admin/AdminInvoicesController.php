@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\InvoicePaidMail;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class AdminInvoicesController extends Controller
@@ -70,7 +72,7 @@ class AdminInvoicesController extends Controller
 
     public function markPaid(int $id): RedirectResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        $invoice = Invoice::with('client')->findOrFail($id);
 
         if ($invoice->status === 'paid') {
             return back()->with('error', 'Invoice is already paid.');
@@ -81,6 +83,16 @@ class AdminInvoicesController extends Controller
             'paid_at'        => now(),
             'payment_method' => 'manual',
         ]);
+
+        if ($invoice->client) {
+            Mail::to($invoice->client->email)->send(new InvoicePaidMail(
+                firstName: $invoice->client->firstname,
+                invoiceId: $invoice->id,
+                amount: (float) $invoice->total,
+                currency: $invoice->currency_code,
+                paidAt: $invoice->paid_at->format('M j, Y \a\t g:i A'),
+            ));
+        }
 
         return back()->with('success', 'Invoice #' . $id . ' marked as paid.');
     }

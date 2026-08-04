@@ -53,6 +53,11 @@ return [
             'transport' => 'ses',
         ],
 
+        'zeptomail-api' => [
+            'transport' => 'zeptomail-api',
+            'token' => env('ZEPTOMAIL_API_TOKEN'),
+        ],
+
         'postmark' => [
             'transport' => 'postmark',
             // 'message_stream_id' => env('POSTMARK_MESSAGE_STREAM_ID'),

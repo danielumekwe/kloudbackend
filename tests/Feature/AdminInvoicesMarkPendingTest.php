@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\AdminRole;
+use App\Mail\InvoicePaidMail;
 use App\Models\Admin;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\PaymentTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class AdminInvoicesMarkPendingTest extends TestCase
@@ -79,6 +81,21 @@ class AdminInvoicesMarkPendingTest extends TestCase
 
         $response->assertSessionHas('error');
         $this->assertSame('unpaid', $invoice->refresh()->status);
+    }
+
+    public function test_marking_an_invoice_paid_sends_the_client_an_invoice_paid_email(): void
+    {
+        $this->loginAsFinanceManager();
+        Mail::fake();
+        $client = $this->makeClient();
+        $invoice = Invoice::create([
+            'client_id' => $client->id, 'status' => 'unpaid', 'currency_code' => 'NGN',
+            'subtotal' => 5000.00, 'total' => 5000.00,
+        ]);
+
+        $this->post("/admin/invoices/{$invoice->id}/mark-paid");
+
+        Mail::assertQueued(InvoicePaidMail::class, fn ($mail) => $mail->hasTo($client->email) && $mail->invoiceId === $invoice->id);
     }
 
     public function test_reverting_shows_a_warning_when_a_real_payment_transaction_exists(): void
