@@ -8,43 +8,7 @@
 
 @section('content')
 
-{{-- Step indicator --}}
-<div class="mb-6">
-    <div class="flex items-center gap-0 mb-4">
-        <div class="flex items-center">
-            <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shadow">1</div>
-            <span class="ml-2 text-sm font-semibold text-blue-600">Configure</span>
-        </div>
-        <div class="flex-1 h-px bg-slate-200 dark:bg-white/10 mx-4 max-w-16"></div>
-        <div class="flex items-center text-slate-400">
-            <div class="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-white/20 flex items-center justify-center text-sm font-bold">2</div>
-            <span class="ml-2 text-sm font-medium">Review</span>
-        </div>
-        <div class="flex-1 h-px bg-slate-200 dark:bg-white/10 mx-4 max-w-16"></div>
-        <div class="flex items-center text-slate-400">
-            <div class="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-white/20 flex items-center justify-center text-sm font-bold">3</div>
-            <span class="ml-2 text-sm font-medium">Complete</span>
-        </div>
-    </div>
-    <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Order {{ $plan['label'] }}</h1>
-    <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Configure your VPS and we'll create an invoice — your server is provisioned automatically once it's paid.</p>
-</div>
-
-@if($errors->any())
-<div class="mb-5 flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
-    <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-    </svg>
-    <div>
-        @foreach($errors->all() as $error)
-            <p class="text-sm text-red-700 dark:text-red-400">{{ $error }}</p>
-        @endforeach
-    </div>
-</div>
-@endif
-
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-5"
-     x-data="vpsOrder({
+<div x-data="vpsOrder({
         templates: {{ json_encode($templates) }},
         osNames: {{ json_encode($osNames) }},
         locations: {{ json_encode($locations) }},
@@ -60,8 +24,53 @@
         pricePerSlice: {{ $pricePerSlice }},
      })">
 
+{{-- Step indicator --}}
+<div class="mb-6">
+    <div class="flex items-center gap-0 mb-4">
+        <div class="flex items-center">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow transition-colors"
+                 :class="step >= 1 ? 'bg-blue-600 text-white' : 'border-2 border-slate-300 dark:border-white/20 text-slate-400'">
+                <template x-if="step > 1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </template>
+                <span x-show="step <= 1">1</span>
+            </div>
+            <span class="ml-2 text-sm font-semibold" :class="step >= 1 ? 'text-blue-600' : 'text-slate-400'">Configure</span>
+        </div>
+        <div class="flex-1 h-px mx-4 max-w-16 transition-colors" :class="step >= 2 ? 'bg-blue-600' : 'bg-slate-200 dark:bg-white/10'"></div>
+        <div class="flex items-center">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
+                 :class="step >= 2 ? 'bg-blue-600 text-white shadow' : 'border-2 border-slate-300 dark:border-white/20 text-slate-400'">2</div>
+            <span class="ml-2 text-sm font-medium" :class="step >= 2 ? 'text-blue-600 font-semibold' : 'text-slate-400'">Review</span>
+        </div>
+        <div class="flex-1 h-px bg-slate-200 dark:bg-white/10 mx-4 max-w-16"></div>
+        <div class="flex items-center text-slate-400">
+            <div class="w-8 h-8 rounded-full border-2 border-slate-300 dark:border-white/20 flex items-center justify-center text-sm font-bold">3</div>
+            <span class="ml-2 text-sm font-medium">Complete</span>
+        </div>
+    </div>
+    <h1 class="text-2xl font-bold text-slate-900 dark:text-white" x-text="step === 2 ? 'Review Your Order' : 'Order {{ $plan['label'] }}'"></h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5" x-text="step === 2 ? 'Confirm the details below, then place your order.' : 'Configure your VPS and we\'ll create an invoice — your server is provisioned automatically once it\'s paid.'"></p>
+</div>
+
+@if($errors->any())
+<div class="mb-5 flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
+    <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div>
+        @foreach($errors->all() as $error)
+            <p class="text-sm text-red-700 dark:text-red-400">{{ $error }}</p>
+        @endforeach
+    </div>
+</div>
+@endif
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
     {{-- ── Main Configuration Form ─────────────────────────────────────── --}}
-    <form id="vps-order-form" method="POST" action="{{ route('vps.store', $category) }}" class="lg:col-span-2 space-y-4" @submit="loading = true">
+    <form id="vps-order-form" method="POST" action="{{ route('vps.store', $category) }}" class="lg:col-span-2 space-y-4"
+          @submit="if (step !== 2 || !agreeToTerms) { $event.preventDefault(); } else { loading = true; }">
         @csrf
         <input type="hidden" name="osDistro"    :value="osDistro">
         <input type="hidden" name="osVersion"   :value="osVersion">
@@ -69,6 +78,8 @@
         <input type="hidden" name="period"      :value="period">
         <input type="hidden" name="controlpanel" :value="controlpanel">
         <input type="hidden" name="slices"      :value="slices">
+
+        <div x-show="step === 1" x-cloak class="space-y-4">
 
         {{-- ── 1. Choose Location ──────────────────────────────────────── --}}
         <div class="card p-0 overflow-hidden">
@@ -384,25 +395,14 @@
             </div>
         </div>
 
-        {{-- ── 6. Identity & Security ───────────────────────────────────── --}}
+        {{-- ── 6. Root Password ───────────────────────────────────── --}}
         <div class="card p-0 overflow-hidden">
             <div class="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-white/[0.05]">
                 <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0"
                      x-text="hasControlpanelOptions() ? '6' : '5'"></div>
-                <h3 class="font-semibold text-slate-900 dark:text-white text-sm">Identity &amp; Security</h3>
+                <h3 class="font-semibold text-slate-900 dark:text-white text-sm">Root Password</h3>
             </div>
             <div class="p-4 space-y-4">
-                <div>
-                    <label class="form-label flex items-center gap-2">
-                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                        Hostname
-                    </label>
-                    <input type="text" name="hostname" x-model="hostname" @blur="quote()"
-                           placeholder="server.example.com"
-                           class="form-input">
-                    <p class="text-xs text-slate-400 mt-1">Must be a full hostname with at least two dots, e.g. <code class="bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-xs">server.example.com</code></p>
-                </div>
-
                 <div>
                     <label class="form-label flex items-center gap-2">
                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
@@ -446,11 +446,64 @@
             </div>
         </div>
 
+        </div>{{-- /step 1 --}}
+
+        {{-- ── Step 2: Review Order Details ─────────────────────────────── --}}
+        <div x-show="step === 2" x-cloak class="space-y-4">
+            <div class="card p-0 overflow-hidden">
+                <div class="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-white/[0.05]">
+                    <svg class="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    <h3 class="font-semibold text-slate-900 dark:text-white text-sm">Order Details</h3>
+                </div>
+                <div class="divide-y divide-slate-100 dark:divide-white/[0.05]">
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Plan</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $plan['label'] }}</span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">VPS Location</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="locations[location] || '—'"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Slices</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="slices"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Memory</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="(slices * sliceRamGb) + ' GB'"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">HD Space</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="(slices * sliceStorageGb) + ' GB'"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Bandwidth</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="(slices * sliceBandwidthGb).toLocaleString() + ' GB'"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3" x-show="hasControlpanelOptions()">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Control Panel</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="controlpanelOptions[controlpanel]?.label || '—'"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Operating System</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="osDistro === 'cloudinit' ? appLabel(osVersion) : (osNames[osDistro] || osDistro)"></span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Billing Cycle</span>
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="periods[period]?.label || '—'"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </form>
 
     {{-- ── Order Summary Sidebar ────────────────────────────────────────── --}}
     <div class="space-y-4">
-        <div class="card p-0 overflow-hidden sticky top-6">
+        {{-- Step 1: configuration summary --}}
+        <div x-show="step === 1" x-cloak class="card p-0 overflow-hidden sticky top-6">
             <div class="px-5 py-4 border-b border-slate-100 dark:border-white/[0.05]">
                 <div class="flex items-center gap-2 mb-1">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -522,20 +575,52 @@
                         </template>
                     </div>
                 </div>
+                <button type="button" @click="goToReview()"
+                        :disabled="!priceReady || quoting"
+                        class="btn btn-primary w-full justify-center text-sm py-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Continue
+                </button>
+                <p class="text-xs text-center text-slate-400 dark:text-slate-500 mt-3 leading-relaxed">Review your order on the next step before we create an invoice.</p>
+            </div>
+        </div>
+
+        {{-- Step 2: total, terms, place order --}}
+        <div x-show="step === 2" x-cloak class="card p-0 overflow-hidden sticky top-6">
+            <div class="px-5 py-4 border-b border-slate-100 dark:border-white/[0.05]">
+                <h3 class="font-semibold text-slate-900 dark:text-white text-sm">{{ $plan['label'] }}</h3>
+            </div>
+            <div class="px-5 py-5">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total Due Today</span>
+                <div class="mt-1 mb-4">
+                    <span class="text-3xl font-bold text-slate-900 dark:text-white" x-text="formatPrice(price)"></span>
+                    <div class="text-xs text-slate-400 mt-0.5">Billed <span x-text="periods[period]?.label?.toLowerCase() || 'monthly'"></span></div>
+                </div>
+                <div class="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 mb-4">
+                    <svg class="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <p class="text-xs text-blue-700 dark:text-blue-300">Auto-renews at <span class="font-semibold" x-text="formatPrice(price)"></span> every <span x-text="periods[period]?.label?.toLowerCase() || 'month'"></span> until canceled.</p>
+                </div>
+                <label class="flex items-start gap-2 mb-4 cursor-pointer">
+                    <input type="checkbox" x-model="agreeToTerms" class="mt-0.5 rounded border-slate-300 dark:border-white/20 text-blue-600 focus:ring-blue-500">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">I agree to the auto-renewal terms above and acknowledge this subscription will be billed to my account until canceled.</span>
+                </label>
                 <button type="submit" form="vps-order-form"
-                        :disabled="loading"
-                        class="btn btn-primary w-full justify-center text-sm py-3">
-                    <span x-show="!loading">Continue</span>
+                        :disabled="!agreeToTerms || loading"
+                        class="btn btn-primary w-full justify-center text-sm py-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span x-show="!loading">Place Order</span>
                     <span x-show="loading" class="flex items-center gap-2">
                         <div class="spinner"></div>
                         Creating invoice…
                     </span>
+                </button>
+                <button type="button" @click="step = 1" class="w-full text-center text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mt-3">
+                    ← Go Back to Edit
                 </button>
                 <p class="text-xs text-center text-slate-400 dark:text-slate-500 mt-3 leading-relaxed">An invoice will be created and your server provisioned automatically once paid.</p>
             </div>
         </div>
     </div>
 
+</div>
 </div>
 @endsection
 
@@ -566,13 +651,14 @@ function vpsOrder(opts) {
         location: '',
         slices: opts.minSlices,
         period: 1,
-        hostname: '',
         rootpass: '',
         showPassword: false,
         controlpanel: Object.keys(opts.controlpanelOptions)[0] || '',
         osTab: 'templates',
         appSearch: '',
         appPage: 1,
+        step: 1,
+        agreeToTerms: false,
         appsPerPage: 25,
 
         price: null,
@@ -589,6 +675,25 @@ function vpsOrder(opts) {
             this.osVersion = Object.keys(this.templates[this.osDistro] || {})[0] || '';
             const avail = this.availableLocations();
             if (avail.length) this.location = avail[0];
+            this.quote();
+        },
+
+        goToReview() {
+            if (!this.location || !this.osDistro || !this.osVersion) {
+                this.quoteError = 'Please complete your configuration before continuing.';
+                return;
+            }
+            if (!this.rootpass || this.rootpass.length < 8) {
+                this.quoteError = 'Root password must be at least 8 characters.';
+                return;
+            }
+            if (!this.priceReady) {
+                this.quoteError = this.quoteError || 'Please wait for pricing to finish calculating.';
+                return;
+            }
+            this.quoteError = '';
+            this.step = 2;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         },
 
         osTemplateDistros() {
@@ -847,7 +952,7 @@ function vpsOrder(opts) {
         },
 
         async quote() {
-            if (!this.hostname || !/^.*\..*\..*$/.test(this.hostname)) {
+            if (!this.location || !this.osDistro || !this.osVersion) {
                 this.price = null;
                 return;
             }
@@ -868,7 +973,6 @@ function vpsOrder(opts) {
                         slices:       this.slices,
                         location:     this.location,
                         period:       this.period,
-                        hostname:     this.hostname,
                         controlpanel: this.controlpanel,
                     }),
                 });

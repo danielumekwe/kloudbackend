@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class VpsController extends Controller
@@ -125,7 +126,6 @@ class VpsController extends Controller
             'slices'   => ['required', 'integer', "min:{$minSlices}", 'max:32'],
             'location' => ['required', 'integer'],
             'period'   => ['required', 'integer', 'in:1,6,12,24,36'],
-            'hostname' => ['required', 'string'],
             'controlpanel' => $this->controlpanelRule($plan),
         ]);
 
@@ -137,7 +137,7 @@ class VpsController extends Controller
             'location'     => $validated['location'],
             'period'       => $validated['period'],
             'controlpanel' => $plan['controlpanel'],
-            'hostname'     => $validated['hostname'],
+            'hostname'     => $this->generateHostname($validated['category']),
             'rootpass'     => 'Tmp1234!Tmp1234!', // placeholder for the stock-check; the real password is set at order time
         ]);
 
@@ -169,11 +169,11 @@ class VpsController extends Controller
             'slices'    => ['required', 'integer', "min:{$minSlices}", 'max:32'],
             'location'  => ['required', 'integer'],
             'period'    => ['required', 'integer', 'in:1,6,12,24,36'],
-            'hostname'  => ['required', 'string', 'regex:/^.*\..*\..*$/'],
             'rootpass'  => ['required', 'string', 'min:8'],
             'controlpanel' => $this->controlpanelRule($plan),
         ]);
         $validated['category'] = $category;
+        $validated['hostname'] = $this->generateHostname($category);
 
         $clientId = session('clientId');
 
@@ -199,7 +199,7 @@ class VpsController extends Controller
 
         $client = Client::find($clientId);
 
-        $orderDescription = "{$plan['label']} — {$validated['slices']} slice(s) — {$validated['hostname']}";
+        $orderDescription = "{$plan['label']} — {$validated['slices']} slice(s)";
 
         $invoice = $this->invoices->createAt($client, $orderDescription, $price, $currencyCode);
 
@@ -353,6 +353,16 @@ class VpsController extends Controller
         }
 
         return response()->json(['success' => true, 'message' => $result['text'] ?? 'Action completed successfully.', 'data' => $result]);
+    }
+
+    /**
+     * InterServer requires a hostname on VPS order/quote to set on the OS install.
+     * We no longer collect this from the customer, so generate one that satisfies
+     * their FQDN format check; the client can rename it later from the VPS actions panel.
+     */
+    private function generateHostname(string $category): string
+    {
+        return sprintf('%s-%s.kloud101.com', Str::slug($category), Str::lower(Str::random(6)));
     }
 
     /**
