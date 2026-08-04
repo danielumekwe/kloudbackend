@@ -550,6 +550,7 @@
                         </div>
                     </div>
 
+                    @if(config('app.multi_currency_enabled'))
                     {{-- Currency switcher --}}
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open"
@@ -588,6 +589,7 @@
                             @endforeach
                         </div>
                     </div>
+                    @endif
 
                     {{-- User dropdown --}}
                     <div class="relative" x-data="{ open: false }">

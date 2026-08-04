@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PaymentCredentials;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -12,8 +13,8 @@ class FlutterwaveService
 
     public function __construct()
     {
-        $this->secretKey  = config('services.flutterwave.secret_key');
-        $this->webhookHash = config('services.flutterwave.webhook_hash');
+        $this->secretKey  = (string) PaymentCredentials::get('flutterwave', 'secret_key');
+        $this->webhookHash = (string) PaymentCredentials::get('flutterwave', 'webhook_hash');
     }
 
     public function verifyTransaction(string $transactionId): array

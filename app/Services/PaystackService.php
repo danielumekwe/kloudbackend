@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PaymentCredentials;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -11,7 +12,7 @@ class PaystackService
 
     public function __construct()
     {
-        $this->secretKey = config('services.paystack.secret_key');
+        $this->secretKey = (string) PaymentCredentials::get('paystack', 'secret_key');
     }
 
     public function verifyTransaction(string $reference): array

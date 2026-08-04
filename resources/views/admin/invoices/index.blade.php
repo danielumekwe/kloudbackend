@@ -3,9 +3,12 @@
 @section('breadcrumb', 'Invoices')
 
 @section('content')
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Invoices</h1>
-    <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">All client invoices across the platform.</p>
+<div class="mb-6 flex items-start justify-between gap-4 flex-wrap">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Invoices</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">All client invoices across the platform.</p>
+    </div>
+    <a href="{{ route('admin.invoices.create') }}" class="btn btn-primary text-sm">New Invoice</a>
 </div>
 
 @if(session('success'))

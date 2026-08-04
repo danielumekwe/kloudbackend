@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminClientController;
 use App\Http\Controllers\Admin\AdminInvoicesController;
 use App\Http\Controllers\Admin\AdminOrdersController;
+use App\Http\Controllers\Admin\AdminPaymentSettingsController;
 use App\Http\Controllers\Admin\AdminPricingController;
 use App\Http\Controllers\Admin\AdminProductsController;
 use App\Http\Controllers\Admin\AdminServicesController;
@@ -282,12 +283,20 @@ Route::prefix('admin')->group(function () {
 
             Route::prefix('invoices')->group(function () {
                 Route::get('/',                    [AdminInvoicesController::class, 'index'])->name('admin.invoices.index');
+                Route::get('/create',              [AdminInvoicesController::class, 'create'])->name('admin.invoices.create');
+                Route::post('/',                   [AdminInvoicesController::class, 'store'])->name('admin.invoices.store');
                 Route::get('/{id}',                [AdminInvoicesController::class, 'show'])->name('admin.invoices.show');
                 Route::post('/{id}/mark-paid',     [AdminInvoicesController::class, 'markPaid'])->name('admin.invoices.mark-paid');
+                Route::post('/{id}/mark-pending',  [AdminInvoicesController::class, 'markPending'])->name('admin.invoices.mark-pending');
                 Route::post('/{id}/cancel',        [AdminInvoicesController::class, 'cancel'])->name('admin.invoices.cancel');
             });
 
             Route::get('/transactions', [AdminTransactionsController::class, 'index'])->name('admin.transactions.index');
+        });
+
+        Route::middleware('admin.role:super_admin')->group(function () {
+            Route::get('/payment-settings',  [AdminPaymentSettingsController::class, 'index'])->name('admin.payment-settings');
+            Route::post('/payment-settings', [AdminPaymentSettingsController::class, 'update'])->name('admin.payment-settings.update');
         });
 
         Route::middleware('admin.role:super_admin,support_agent')->prefix('tickets')->group(function () {

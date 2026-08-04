@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PaymentCredentials;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -14,8 +15,8 @@ class NowPaymentsService
     public function __construct()
     {
         $this->apiUrl    = rtrim(config('services.nowpayments.url'), '/');
-        $this->apiKey    = config('services.nowpayments.api_key');
-        $this->ipnSecret = config('services.nowpayments.ipn_secret');
+        $this->apiKey    = (string) PaymentCredentials::get('nowpayments', 'api_key');
+        $this->ipnSecret = (string) PaymentCredentials::get('nowpayments', 'ipn_secret');
     }
 
     /**

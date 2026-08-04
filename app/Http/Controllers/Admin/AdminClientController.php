@@ -13,6 +13,7 @@ use App\Models\QsOrder;
 use App\Models\SslOrder;
 use App\Models\VpsOrder;
 use App\Services\TicketService;
+use App\Support\CurrencyConverter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -135,8 +136,10 @@ class AdminClientController extends Controller
         $client->increment('credit_balance', $validated['amount']);
 
         return redirect()->route('admin.clients.show', $client)
-            ->with('success', sprintf('Added $%.2f credit to %s %s. New balance: $%.2f.',
-                $validated['amount'], $client->firstname, $client->lastname, (float) $client->fresh()->credit_balance));
+            ->with('success', sprintf('Added %s credit to %s %s. New balance: %s.',
+                CurrencyConverter::format((float) $validated['amount'], 'NGN'),
+                $client->firstname, $client->lastname,
+                CurrencyConverter::format((float) $client->fresh()->credit_balance, 'NGN')));
     }
 
     public function sendEmail(Request $request, Client $client): RedirectResponse

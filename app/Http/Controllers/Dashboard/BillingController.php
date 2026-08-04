@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Dashboard;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Support\PaymentCredentials;
 use Illuminate\View\View;
 
 class BillingController extends Controller
@@ -25,8 +26,8 @@ class BillingController extends Controller
 
         // Payment is collected inside this app (Paystack/Flutterwave/crypto) — clients
         // never see a third-party hosted invoice page.
-        $paystackPublicKey = config('services.paystack.public_key');
-        $flutterwavePublicKey = config('services.flutterwave.public_key');
+        $paystackPublicKey = PaymentCredentials::get('paystack', 'public_key');
+        $flutterwavePublicKey = PaymentCredentials::get('flutterwave', 'public_key');
 
         return view('dashboard.billing.show', compact('invoice', 'paystackPublicKey', 'flutterwavePublicKey'));
     }

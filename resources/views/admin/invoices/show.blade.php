@@ -86,6 +86,24 @@
         </form>
     </div>
     @endif
+
+    @if($invoice->status === 'paid')
+    <div class="flex items-center gap-3 flex-wrap mt-5 pt-5 border-t border-slate-100 dark:border-white/[0.06]">
+        @if($invoice->paymentTransactions->isNotEmpty())
+        <p class="text-xs text-amber-600 dark:text-amber-400 w-full">
+            A real gateway payment transaction exists for this invoice — reverting to pending will not refund it.
+        </p>
+        @endif
+        <form method="POST" action="{{ route('admin.invoices.mark-pending', $invoice->id) }}"
+              x-data="{ confirm: false }"
+              @submit.prevent="confirm ? $el.submit() : (confirm = true)">
+            @csrf
+            <button type="submit"
+                    x-text="confirm ? 'Click again to confirm' : 'Revert to Pending'"
+                    class="btn btn-secondary text-sm"></button>
+        </form>
+    </div>
+    @endif
 </div>
 
 {{-- Line items --}}

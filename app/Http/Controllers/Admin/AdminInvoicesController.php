@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\Invoice;
+use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -30,6 +32,35 @@ class AdminInvoicesController extends Controller
         return view('admin.invoices.index', compact('invoices', 'stats', 'status'));
     }
 
+    public function create(Request $request): View
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $clients = $query !== ''
+            ? Client::where('email', 'like', "%{$query}%")
+                ->orWhere('firstname', 'like', "%{$query}%")
+                ->orWhere('lastname', 'like', "%{$query}%")
+                ->limit(20)->get()
+            : collect();
+
+        return view('admin.invoices.create', compact('clients', 'query'));
+    }
+
+    public function store(Request $request, InvoiceService $invoices): RedirectResponse
+    {
+        $validated = $request->validate([
+            'client_id'   => ['required', 'exists:clients,id'],
+            'description' => ['required', 'string', 'max:255'],
+            'amount'      => ['required', 'numeric', 'min:0.01'],
+        ]);
+
+        $client = Client::findOrFail($validated['client_id']);
+
+        $invoice = $invoices->createAt($client, $validated['description'], (float) $validated['amount'], 'NGN');
+
+        return redirect()->route('admin.invoices.show', $invoice->id)->with('success', 'Invoice created.');
+    }
+
     public function show(int $id): View
     {
         $invoice = Invoice::with(['client', 'items', 'paymentTransactions'])->findOrFail($id);
@@ -52,6 +83,19 @@ class AdminInvoicesController extends Controller
         ]);
 
         return back()->with('success', 'Invoice #' . $id . ' marked as paid.');
+    }
+
+    public function markPending(int $id): RedirectResponse
+    {
+        $invoice = Invoice::findOrFail($id);
+
+        if ($invoice->status !== 'paid') {
+            return back()->with('error', 'Only paid invoices can be reverted to pending.');
+        }
+
+        $invoice->update(['status' => 'unpaid', 'paid_at' => null, 'payment_method' => null]);
+
+        return back()->with('success', 'Invoice #' . $id . ' reverted to pending.');
     }
 
     public function cancel(int $id): RedirectResponse

@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Multi-Currency Toggle
+    |--------------------------------------------------------------------------
+    |
+    | Billing is Naira-only for now (see App\Http\Middleware\ClientAuth and
+    | Dashboard\CurrencyController). This flag only gates the currency switcher
+    | UI — flip it back on to re-expose currency choice once multi-currency
+    | billing is reinstated; the underlying conversion machinery is untouched.
+    |
+    */
+
+    'multi_currency_enabled' => (bool) env('MULTI_CURRENCY_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

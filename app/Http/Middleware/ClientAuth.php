@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\Client;
-use App\Support\CurrencyConverter;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -64,15 +63,13 @@ class ClientAuth
     }
 
     /**
-     * Every authenticated request needs a valid session('currency'), seeded from
-     * the configured default on first login.
+     * Billing is Naira-only for now — forced every request (not just seeded once)
+     * so an already-open session can't keep a stale non-NGN currency. Hardcoded
+     * rather than driven by CurrencyConverter::default() to keep "what currency
+     * clients see" decoupled from "what currency internal prices are computed in".
      */
     private function ensureCurrencyDefault(): void
     {
-        if (session()->has('currency')) {
-            return;
-        }
-
-        session(['currency' => CurrencyConverter::default()['code']]);
+        session(['currency' => 'NGN']);
     }
 }

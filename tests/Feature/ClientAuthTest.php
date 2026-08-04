@@ -87,4 +87,14 @@ class ClientAuthTest extends TestCase
         $response->assertRedirect(route('login'));
         $this->assertNull(session('clientId'));
     }
+
+    public function test_currency_is_locked_to_ngn_even_if_session_already_has_a_different_value(): void
+    {
+        $client = $this->makeClient();
+        $this->withSession(['clientId' => $client->id, 'currency' => 'USD']);
+
+        $this->get('/dashboard');
+
+        $this->assertSame('NGN', session('currency'));
+    }
 }
