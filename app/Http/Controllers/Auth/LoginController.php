@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Mail\LoginAlertMail;
 use App\Models\Client;
+use App\Models\LoginActivity;
 use App\Services\IpLocationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -47,10 +48,19 @@ class LoginController extends Controller
             'email'     => $client->email,
         ]);
 
+        $location = app(IpLocationService::class)->locate($request->ip());
+
+        LoginActivity::create([
+            'client_id'  => $client->id,
+            'ip_address' => $request->ip(),
+            'location'   => $location,
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+        ]);
+
         Mail::to($client->email)->send(new LoginAlertMail(
             firstName: $client->firstname,
             ip: $request->ip(),
-            location: app(IpLocationService::class)->locate($request->ip()),
+            location: $location,
             loggedInAt: now()->format('M j, Y \a\t g:i A'),
         ));
 

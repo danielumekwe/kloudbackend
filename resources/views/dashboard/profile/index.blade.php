@@ -216,6 +216,43 @@
             </form>
         </div>
 
+        {{-- Login activity --}}
+        <div id="login-activity" class="card !p-0 overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 dark:border-white/[0.06]">
+                <h3 class="font-semibold text-slate-900 dark:text-white">Login Activity</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Recent sign-ins to your account, most recent first.</p>
+            </div>
+            @if($loginActivity->isEmpty())
+                <div class="px-5 py-10 text-center">
+                    <svg class="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                    </svg>
+                    <p class="text-sm text-slate-400 dark:text-slate-500">No login activity recorded yet.</p>
+                </div>
+            @else
+                <ul class="divide-y divide-slate-100 dark:divide-white/[0.04]">
+                    @foreach($loginActivity as $activity)
+                    <li class="flex items-start gap-3 px-5 py-3.5">
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium text-slate-900 dark:text-white">Account Login</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                IP: {{ $activity->ip_address }}{{ $activity->location ? ' · ' . $activity->location : '' }}
+                            </p>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{{ $activity->created_at->format('M j, Y \a\t g:i A') }}</p>
+                        </div>
+                    </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+
     </div>
 </div>
 @endsection

@@ -4,7 +4,12 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\DomainOrder;
 use App\Models\Invoice;
+use App\Models\LoginActivity;
+use App\Models\QsOrder;
+use App\Models\SslOrder;
+use App\Models\VpsOrder;
 use App\Services\TicketService;
 use App\Services\WhmcsService;
 use Illuminate\View\View;
@@ -32,6 +37,14 @@ class HomeController extends Controller
         $recentInvoices = $invoices->take(5);
         $recentTickets  = array_slice($tickets, 0, 5);
 
+        // Per-category active counts for the dashboard's "Services" grid.
+        $vpsActive     = VpsOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
+        $qsActive      = QsOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
+        $sslActive     = SslOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
+        $domainsActive = DomainOrder::where('client_id', $clientId)->where('status', 'provisioned')->count();
+
+        $recentActivity = LoginActivity::where('client_id', $clientId)->latest()->take(5)->get();
+
         return view('dashboard.home', compact(
             'services',
             'activeServices',
@@ -41,6 +54,11 @@ class HomeController extends Controller
             'recentTickets',
             'client',
             'clientId',
+            'vpsActive',
+            'qsActive',
+            'sslActive',
+            'domainsActive',
+            'recentActivity',
         ));
     }
 }

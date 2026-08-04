@@ -83,6 +83,44 @@
 }
 
 /* -----------------------------------------------------------------------
+   Floating dock (bottom-of-screen quick nav)
+------------------------------------------------------------------------ */
+.dock-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    color: theme(colors.slate.500);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dock-link:hover {
+    background-color: theme(colors.slate.100);
+    color: theme(colors.slate.900);
+}
+
+.dock-link.active {
+    background-color: theme(colors.blue.50);
+    color: theme(colors.blue.700);
+}
+
+.dark .dock-link {
+    color: theme(colors.slate.400);
+}
+
+.dark .dock-link:hover {
+    background-color: rgba(255,255,255,0.06);
+    color: theme(colors.white);
+}
+
+.dark .dock-link.active {
+    background-color: rgba(59,130,246,0.15);
+    color: theme(colors.blue.400);
+}
+
+/* -----------------------------------------------------------------------
    Cards
 ------------------------------------------------------------------------ */
 .card {

@@ -66,7 +66,13 @@ window.appLayout = function () {
     return {
         darkMode: document.documentElement.classList.contains('dark'),
         isDesktop: window.innerWidth >= 1024,
-        sidebarOpen: window.innerWidth >= 1024,
+        // On desktop the hamburger toggles a persisted collapse preference; on mobile
+        // it always starts closed (an overlay you explicitly open), so the two must be
+        // tracked separately — otherwise reopening on mobile would inherit whatever the
+        // desktop collapse state happened to be.
+        sidebarOpen: window.innerWidth >= 1024
+            ? localStorage.getItem('sidebarCollapsed') !== 'true'
+            : false,
 
         init() {
             // Only flip sidebar state when actually crossing the lg breakpoint —
@@ -79,9 +85,18 @@ window.appLayout = function () {
                 const desktopNow = window.innerWidth >= 1024;
                 if (desktopNow !== this.isDesktop) {
                     this.isDesktop = desktopNow;
-                    this.sidebarOpen = desktopNow;
+                    this.sidebarOpen = desktopNow
+                        ? localStorage.getItem('sidebarCollapsed') !== 'true'
+                        : false;
                 }
             });
+        },
+
+        toggleSidebar() {
+            this.sidebarOpen = !this.sidebarOpen;
+            if (this.isDesktop) {
+                localStorage.setItem('sidebarCollapsed', this.sidebarOpen ? 'false' : 'true');
+            }
         },
 
         toggleDark() {

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\LoginActivity;
+use App\Services\IpLocationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -125,6 +127,13 @@ class SocialLoginController extends Controller
             'firstName' => $client->firstname,
             'lastName'  => $client->lastname,
             'email'     => $client->email,
+        ]);
+
+        LoginActivity::create([
+            'client_id'  => $client->id,
+            'ip_address' => request()->ip(),
+            'location'   => app(IpLocationService::class)->locate(request()->ip()),
+            'user_agent' => substr((string) request()->userAgent(), 0, 255),
         ]);
     }
 

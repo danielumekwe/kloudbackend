@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\LoginActivity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -15,7 +16,9 @@ class ProfileController extends Controller
     {
         $client = Client::findOrFail(session('clientId'));
 
-        return view('dashboard.profile.index', ['client' => $client]);
+        $loginActivity = LoginActivity::where('client_id', $client->id)->latest()->take(20)->get();
+
+        return view('dashboard.profile.index', ['client' => $client, 'loginActivity' => $loginActivity]);
     }
 
     public function update(Request $request): RedirectResponse

@@ -91,6 +91,97 @@
             </div>
         </div>
 
+        {{-- Services --}}
+        <div>
+            <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Services</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                @php
+                    $serviceCards = [
+                        [
+                            'label' => 'VPS', 'count' => $vpsActive, 'iconColor' => 'text-blue-500',
+                            'icon' => 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01',
+                            'view' => ['route' => 'vps.index'], 'order' => ['route' => 'vps.catalog', 'param' => 'linux-vps'],
+                        ],
+                        [
+                            'label' => 'Quick Servers', 'count' => $qsActive, 'iconColor' => 'text-blue-500',
+                            'icon' => 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2',
+                            'view' => ['route' => 'qs.index'], 'order' => ['route' => 'qs.catalog'],
+                        ],
+                        [
+                            'label' => 'SSL Certificates', 'count' => $sslActive, 'iconColor' => 'text-purple-500',
+                            'icon' => 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 10-8 0v4h8z',
+                            'view' => ['route' => 'ssl.index'], 'order' => ['route' => 'ssl.catalog'],
+                        ],
+                        [
+                            'label' => 'Domains', 'count' => $domainsActive, 'iconColor' => 'text-purple-500',
+                            'icon' => 'M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 000 18M12.5 3a17 17 0 010 18',
+                            'view' => ['route' => 'domains.index'], 'order' => ['route' => 'domains.search'],
+                        ],
+                        [
+                            'label' => 'My Services', 'count' => $activeServices, 'iconColor' => 'text-slate-500',
+                            'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+                            'view' => ['route' => 'servers.index'], 'order' => ['route' => 'servers.order'],
+                        ],
+                        [
+                            'label' => 'Business Email Hosting', 'count' => null, 'iconColor' => 'text-amber-500',
+                            'icon' => 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+                            'view' => null, 'order' => ['route' => 'coming-soon', 'param' => 'business-email-hosting'],
+                        ],
+                        [
+                            'label' => 'Backup & Security', 'count' => null, 'iconColor' => 'text-amber-500',
+                            'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+                            'view' => null, 'order' => ['route' => 'coming-soon', 'param' => 'backup-and-security'],
+                        ],
+                    ];
+                @endphp
+
+                @foreach($serviceCards as $svc)
+                <div class="card !p-0 overflow-hidden flex flex-col">
+                    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-white/[0.06]">
+                        <div class="flex items-center gap-2.5">
+                            <svg class="w-4.5 h-4.5 {{ $svc['iconColor'] }} flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $svc['icon'] }}"/>
+                            </svg>
+                            <h4 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $svc['label'] }}</h4>
+                        </div>
+                        @if(is_null($svc['count']))
+                            <span class="text-[11px] font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                                Coming Soon
+                            </span>
+                        @else
+                            <span class="text-[11px] font-medium px-2 py-1 rounded-full {{ $svc['count'] > 0 ? 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400' }}">
+                                {{ $svc['count'] }} Active
+                            </span>
+                        @endif
+                    </div>
+
+                    <div class="flex-1 flex items-center justify-center px-5 py-6 text-center">
+                        @if(is_null($svc['count']))
+                            <p class="text-sm text-slate-400 dark:text-slate-500">Not available yet</p>
+                        @elseif($svc['count'] > 0)
+                            <a href="{{ route($svc['view']['route']) }}" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                                View {{ $svc['count'] }} active {{ \Illuminate\Support\Str::plural('service', $svc['count']) }}
+                            </a>
+                        @else
+                            <p class="text-sm text-slate-400 dark:text-slate-500">No active services</p>
+                        @endif
+                    </div>
+
+                    <a href="{{ isset($svc['order']['param']) ? route($svc['order']['route'], $svc['order']['param']) : route($svc['order']['route']) }}"
+                       class="flex items-center justify-center gap-1.5 px-5 py-3 text-sm font-semibold text-blue-600 dark:text-blue-400
+                              border-t border-slate-100 dark:border-white/[0.06] hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Order New
+                    </a>
+                </div>
+                @endforeach
+
+            </div>
+        </div>
+
         {{-- Quick actions --}}
         <div class="card">
             <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Quick Actions</h3>
@@ -263,6 +354,41 @@
                     </svg>
                 </button>
             </div>
+        </div>
+
+        {{-- Recent Activity --}}
+        <div class="card !p-0 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-white/[0.06]">
+                <h3 class="font-semibold text-slate-900 dark:text-white">Recent Activity</h3>
+                <a href="{{ route('profile.index') }}#login-activity" class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">View all</a>
+            </div>
+            @if($recentActivity->isEmpty())
+                <div class="px-5 py-8 text-center">
+                    <svg class="w-9 h-9 mx-auto text-slate-300 dark:text-slate-600 mb-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                    </svg>
+                    <p class="text-sm text-slate-400 dark:text-slate-500">No activity yet.</p>
+                </div>
+            @else
+                <ul class="divide-y divide-slate-100 dark:divide-white/[0.04]">
+                    @foreach($recentActivity as $activity)
+                    <li class="flex items-start gap-3 px-5 py-3">
+                        <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <svg class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium text-slate-900 dark:text-white">Account Login</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">IP: {{ $activity->ip_address }}</p>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{{ $activity->created_at->diffForHumans() }}</p>
+                        </div>
+                    </li>
+                    @endforeach
+                </ul>
+            @endif
         </div>
 
         {{-- Wallet / Credit balance --}}
