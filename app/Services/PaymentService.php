@@ -98,4 +98,62 @@ class PaymentService
 
         return ['success' => true, 'message' => 'Payment recorded.'];
     }
+
+    /**
+     * Wallet top-ups have no invoice to match against — the amount paid simply
+     * is the amount credited, bounded only by the ₦10,000–₦5,000,000 wallet
+     * funding limits (enforced here too, not just client-side, since this is
+     * also the webhook's authoritative path).
+     */
+    public function recordWalletTopUp(
+        int $clientId,
+        string $gateway,
+        string $reference,
+        float $amount,
+        string $currency,
+        array $rawPayload = [],
+    ): array {
+        $client = Client::find($clientId);
+
+        if (! $client) {
+            Log::error('PaymentService: client not found before recording wallet top-up', [
+                'client_id' => $clientId, 'gateway' => $gateway, 'reference' => $reference,
+            ]);
+            return ['success' => false, 'message' => 'Could not verify the client.'];
+        }
+
+        if (PaymentTransaction::where('gateway', $gateway)->where('gateway_reference', $reference)->exists()) {
+            return ['success' => true, 'message' => 'Payment already recorded.', 'duplicate' => true];
+        }
+
+        if (strcasecmp($currency, 'NGN') !== 0 || $amount < 10_000 || $amount > 5_000_000) {
+            Log::error('PaymentService: wallet top-up amount/currency out of bounds, refusing to record', [
+                'client_id' => $clientId, 'gateway' => $gateway, 'reference' => $reference,
+                'amount' => $amount, 'currency' => $currency,
+            ]);
+            return ['success' => false, 'message' => 'Amount is outside the allowed wallet funding range.'];
+        }
+
+        try {
+            PaymentTransaction::create([
+                'client_id'         => $clientId,
+                'invoice_id'        => null,
+                'gateway'           => $gateway,
+                'gateway_reference' => $reference,
+                'amount'            => $amount,
+                'currency'          => $currency,
+                'purpose'           => 'wallet_topup',
+                'status'            => 'completed',
+                'raw_payload'       => $rawPayload,
+            ]);
+        } catch (QueryException $e) {
+            // Unique constraint on gateway_reference — the webhook and the client-verify
+            // call raced each other; whichever got here first already recorded it.
+            return ['success' => true, 'message' => 'Payment already recorded.', 'duplicate' => true];
+        }
+
+        $client->increment('credit_balance', $amount);
+
+        return ['success' => true, 'message' => 'Wallet funded successfully.'];
+    }
 }

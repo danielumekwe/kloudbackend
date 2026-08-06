@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Client;
 use App\Models\Invoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class PaymentWebhookTest extends TestCase
@@ -175,5 +177,104 @@ class PaymentWebhookTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseCount('payment_transactions', 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // Wallet top-ups
+    // -------------------------------------------------------------------------
+
+    private function makeClient(array $overrides = []): Client
+    {
+        return Client::create(array_merge([
+            'email' => 'wallet@example.com',
+            'password' => Hash::make('password123'),
+            'firstname' => 'Jane',
+            'lastname' => 'Doe',
+        ], $overrides));
+    }
+
+    public function test_paystack_webhook_credits_wallet_instead_of_an_invoice(): void
+    {
+        $client = $this->makeClient();
+
+        $body = [
+            'event' => 'charge.success',
+            'data' => [
+                'status' => 'success',
+                'reference' => "kloud101-wallet-{$client->id}-abc",
+                'amount' => 2500000, // kobo -> 25,000 NGN
+                'currency' => 'NGN',
+                'metadata' => ['purpose' => 'wallet', 'client_id' => $client->id],
+            ],
+        ];
+        $payload = json_encode($body);
+        $signature = hash_hmac('sha512', $payload, 'paystack-secret');
+
+        $response = $this->call('POST', '/webhooks/paystack', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_x-paystack-signature' => $signature,
+        ], $payload);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('payment_transactions', [
+            'client_id' => $client->id,
+            'invoice_id' => null,
+            'gateway' => 'paystack',
+            'purpose' => 'wallet_topup',
+            'gateway_reference' => "kloud101-wallet-{$client->id}-abc",
+        ]);
+        $this->assertSame('25000.00', $client->refresh()->credit_balance);
+    }
+
+    public function test_flutterwave_webhook_credits_wallet_instead_of_an_invoice(): void
+    {
+        $client = $this->makeClient();
+
+        $response = $this->postJson('/webhooks/flutterwave', [
+            'data' => [
+                'status' => 'successful',
+                'tx_ref' => "kloud101-wallet-{$client->id}-xyz",
+                'amount' => 25000,
+                'currency' => 'NGN',
+                'meta' => ['purpose' => 'wallet', 'client_id' => $client->id],
+            ],
+        ], ['verif-hash' => 'flutterwave-hash']);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('payment_transactions', [
+            'client_id' => $client->id,
+            'invoice_id' => null,
+            'gateway' => 'flutterwave',
+            'purpose' => 'wallet_topup',
+            'gateway_reference' => "kloud101-wallet-{$client->id}-xyz",
+        ]);
+        $this->assertSame('25000.00', $client->refresh()->credit_balance);
+    }
+
+    public function test_nowpayments_webhook_credits_wallet_instead_of_an_invoice(): void
+    {
+        $client = $this->makeClient();
+
+        $body = [
+            'payment_status' => 'finished',
+            'order_id' => "wallet-{$client->id}-1700000000",
+            'payment_id' => 'np-wallet-1',
+            'price_amount' => 25000,
+            'price_currency' => 'ngn',
+        ];
+        ksort($body);
+        $signature = hash_hmac('sha512', json_encode($body, JSON_UNESCAPED_SLASHES), 'nowpayments-secret');
+
+        $response = $this->postJson('/webhooks/nowpayments', $body, ['x-nowpayments-sig' => $signature]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('payment_transactions', [
+            'client_id' => $client->id,
+            'invoice_id' => null,
+            'gateway' => 'nowpayments',
+            'purpose' => 'wallet_topup',
+            'gateway_reference' => 'np-wallet-1',
+        ]);
+        $this->assertSame('25000.00', $client->refresh()->credit_balance);
     }
 }

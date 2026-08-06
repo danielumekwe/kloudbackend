@@ -189,4 +189,133 @@ class PaymentServiceTest extends TestCase
 
         Mail::assertNotQueued(InvoicePaidMail::class);
     }
+
+    // -------------------------------------------------------------------------
+    // Wallet top-ups
+    // -------------------------------------------------------------------------
+
+    private function makeClient(array $overrides = []): Client
+    {
+        return Client::create(array_merge([
+            'email' => 'wallet@example.com',
+            'password' => Hash::make('password123'),
+            'firstname' => 'Jane',
+            'lastname' => 'Doe',
+        ], $overrides));
+    }
+
+    public function test_records_wallet_top_up_and_credits_client_balance(): void
+    {
+        $client = $this->makeClient();
+
+        $result = app(PaymentService::class)->recordWalletTopUp(
+            clientId: $client->id,
+            gateway: 'paystack',
+            reference: 'wallet-ref-1',
+            amount: 25000.00,
+            currency: 'NGN',
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertDatabaseHas('payment_transactions', [
+            'client_id' => $client->id,
+            'invoice_id' => null,
+            'gateway_reference' => 'wallet-ref-1',
+            'purpose' => 'wallet_topup',
+            'status' => 'completed',
+        ]);
+        $this->assertSame('25000.00', $client->refresh()->credit_balance);
+    }
+
+    public function test_wallet_top_up_below_minimum_is_refused(): void
+    {
+        $client = $this->makeClient();
+
+        $result = app(PaymentService::class)->recordWalletTopUp(
+            clientId: $client->id,
+            gateway: 'paystack',
+            reference: 'wallet-ref-1',
+            amount: 5000.00,
+            currency: 'NGN',
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertDatabaseCount('payment_transactions', 0);
+        $this->assertSame('0.00', $client->refresh()->credit_balance);
+    }
+
+    public function test_wallet_top_up_above_maximum_is_refused(): void
+    {
+        $client = $this->makeClient();
+
+        $result = app(PaymentService::class)->recordWalletTopUp(
+            clientId: $client->id,
+            gateway: 'paystack',
+            reference: 'wallet-ref-1',
+            amount: 5_000_001.00,
+            currency: 'NGN',
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertDatabaseCount('payment_transactions', 0);
+    }
+
+    public function test_wallet_top_up_in_wrong_currency_is_refused(): void
+    {
+        $client = $this->makeClient();
+
+        $result = app(PaymentService::class)->recordWalletTopUp(
+            clientId: $client->id,
+            gateway: 'paystack',
+            reference: 'wallet-ref-1',
+            amount: 25000.00,
+            currency: 'USD',
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertDatabaseCount('payment_transactions', 0);
+    }
+
+    public function test_already_recorded_wallet_reference_is_treated_as_duplicate(): void
+    {
+        $client = $this->makeClient();
+
+        PaymentTransaction::create([
+            'client_id' => $client->id,
+            'invoice_id' => null,
+            'gateway' => 'paystack',
+            'gateway_reference' => 'wallet-ref-1',
+            'amount' => 25000.00,
+            'currency' => 'NGN',
+            'purpose' => 'wallet_topup',
+            'status' => 'completed',
+        ]);
+
+        $result = app(PaymentService::class)->recordWalletTopUp(
+            clientId: $client->id,
+            gateway: 'paystack',
+            reference: 'wallet-ref-1',
+            amount: 25000.00,
+            currency: 'NGN',
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['duplicate'] ?? false);
+        $this->assertDatabaseCount('payment_transactions', 1);
+        $this->assertSame('0.00', $client->refresh()->credit_balance);
+    }
+
+    public function test_wallet_top_up_for_unknown_client_is_refused(): void
+    {
+        $result = app(PaymentService::class)->recordWalletTopUp(
+            clientId: 999999,
+            gateway: 'paystack',
+            reference: 'wallet-ref-1',
+            amount: 25000.00,
+            currency: 'NGN',
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertDatabaseCount('payment_transactions', 0);
+    }
 }

@@ -43,14 +43,27 @@ class WebhookController extends Controller
             return response()->json(['message' => 'Ignored']);
         }
 
+        $amount = ((float) ($payload['amount'] ?? 0)) / 100;
+        $currency = $payload['currency'] ?? 'NGN';
+
+        if ($this->isWalletTopUp($payload['metadata'] ?? [], $payload['reference'] ?? '')) {
+            $result = $this->payments->recordWalletTopUp(
+                clientId: (int) ($payload['metadata']['client_id'] ?? 0),
+                gateway: 'paystack',
+                reference: $payload['reference'] ?? '',
+                amount: $amount,
+                currency: $currency,
+                rawPayload: $payload,
+            );
+
+            return response()->json(['message' => $result['message'] ?? 'Processed'], $result['success'] ? 200 : 422);
+        }
+
         $invoiceId = $this->extractInvoiceId($payload['metadata'] ?? [], $payload['reference'] ?? '');
         if (! $invoiceId) {
             Log::error('Paystack webhook: could not determine invoice id', ['payload' => $payload]);
             return response()->json(['message' => 'Could not determine invoice'], 422);
         }
-
-        $amount = ((float) ($payload['amount'] ?? 0)) / 100;
-        $currency = $payload['currency'] ?? 'NGN';
 
         $result = $this->payments->recordPayment(
             invoiceId: $invoiceId,
@@ -82,14 +95,27 @@ class WebhookController extends Controller
         }
 
         $reference = (string) ($payload['tx_ref'] ?? '');
+        $amount = (float) ($payload['amount'] ?? 0);
+        $currency = $payload['currency'] ?? 'NGN';
+
+        if ($this->isWalletTopUp($payload['meta'] ?? [], $reference)) {
+            $result = $this->payments->recordWalletTopUp(
+                clientId: (int) ($payload['meta']['client_id'] ?? 0),
+                gateway: 'flutterwave',
+                reference: $reference,
+                amount: $amount,
+                currency: $currency,
+                rawPayload: $payload,
+            );
+
+            return response()->json(['message' => $result['message'] ?? 'Processed'], $result['success'] ? 200 : 422);
+        }
+
         $invoiceId = $this->extractInvoiceId($payload['meta'] ?? [], $reference);
         if (! $invoiceId) {
             Log::error('Flutterwave webhook: could not determine invoice id', ['payload' => $payload]);
             return response()->json(['message' => 'Could not determine invoice'], 422);
         }
-
-        $amount = (float) ($payload['amount'] ?? 0);
-        $currency = $payload['currency'] ?? 'NGN';
 
         $result = $this->payments->recordPayment(
             invoiceId: $invoiceId,
@@ -120,7 +146,22 @@ class WebhookController extends Controller
             return response()->json(['message' => 'Ignored']);
         }
 
-        $invoiceId = (int) ($payload['order_id'] ?? 0);
+        $orderId = (string) ($payload['order_id'] ?? '');
+
+        if (preg_match('/^wallet-(\d+)-/', $orderId, $matches)) {
+            $result = $this->payments->recordWalletTopUp(
+                clientId: (int) $matches[1],
+                gateway: 'nowpayments',
+                reference: (string) ($payload['payment_id'] ?? ''),
+                amount: (float) ($payload['price_amount'] ?? 0),
+                currency: strtoupper($payload['price_currency'] ?? 'NGN'),
+                rawPayload: $payload,
+            );
+
+            return response()->json(['message' => $result['message'] ?? 'Processed'], $result['success'] ? 200 : 422);
+        }
+
+        $invoiceId = (int) $orderId;
         if (! $invoiceId) {
             Log::error('NOWPayments webhook: could not determine invoice id', ['payload' => $payload]);
             return response()->json(['message' => 'Could not determine invoice'], 422);
@@ -162,5 +203,17 @@ class WebhookController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Wallet top-ups carry purpose: 'wallet' in metadata (see resources/views/
+     * dashboard/billing/index.blade.php), with a kloud101-wallet-{clientId}-...
+     * reference as a fallback in case metadata is ever stripped — mirrors
+     * extractInvoiceId()'s fallback strategy.
+     */
+    private function isWalletTopUp(array $metadata, string $reference): bool
+    {
+        return ($metadata['purpose'] ?? null) === 'wallet'
+            || str_starts_with($reference, 'kloud101-wallet-');
     }
 }

@@ -125,4 +125,92 @@ class PaymentController extends Controller
 
         return response()->json(['success' => true, 'invoice_url' => $result['invoice_url']]);
     }
+
+    /**
+     * Wallet top-up counterparts to verifyPaystack/verifyFlutterwave/initNowPayments
+     * above — same UX-convenience role (the webhook is still authoritative), just
+     * keyed off the logged-in client's session rather than an invoice id, since a
+     * wallet top-up has no invoice to look up.
+     */
+    public function fundWalletPaystackVerify(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['reference' => ['required', 'string']]);
+
+        $verification = $this->paystack->verifyTransaction($validated['reference']);
+
+        if (! ($verification['status'] ?? false) || ($verification['data']['status'] ?? null) !== 'success') {
+            return response()->json(['success' => false, 'message' => 'Payment could not be verified.'], 422);
+        }
+
+        $data = $verification['data'];
+        $amount = ((float) ($data['amount'] ?? 0)) / 100; // Paystack amounts are in the smallest currency unit (kobo)
+        $currency = $data['currency'] ?? 'NGN';
+
+        $result = $this->payments->recordWalletTopUp(
+            clientId: (int) session('clientId'),
+            gateway: 'paystack',
+            reference: $validated['reference'],
+            amount: $amount,
+            currency: $currency,
+            rawPayload: $data,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function fundWalletFlutterwaveVerify(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['transaction_id' => ['required', 'string']]);
+
+        $verification = $this->flutterwave->verifyTransaction($validated['transaction_id']);
+
+        if (($verification['status'] ?? null) !== 'success' || ($verification['data']['status'] ?? null) !== 'successful') {
+            return response()->json(['success' => false, 'message' => 'Payment could not be verified.'], 422);
+        }
+
+        $data = $verification['data'];
+        $amount = (float) ($data['amount'] ?? 0);
+        $currency = $data['currency'] ?? 'NGN';
+        $reference = (string) ($data['tx_ref'] ?? $validated['transaction_id']);
+
+        $result = $this->payments->recordWalletTopUp(
+            clientId: (int) session('clientId'),
+            gateway: 'flutterwave',
+            reference: $reference,
+            amount: $amount,
+            currency: $currency,
+            rawPayload: $data,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Crypto confirmation only ever arrives later via the webhook (same as
+     * initNowPayments above) — there is no client-triggered verify step.
+     */
+    public function fundWalletNowPaymentsInit(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:10000', 'max:5000000'],
+        ]);
+
+        $clientId = (int) session('clientId');
+
+        $result = $this->nowPayments->createInvoice([
+            'price_amount'      => (float) $validated['amount'],
+            'price_currency'    => 'ngn',
+            'order_id'          => "wallet-{$clientId}-" . time(),
+            'order_description' => 'Wallet top-up',
+            'ipn_callback_url'  => route('webhooks.nowpayments'),
+            'success_url'       => route('billing.index'),
+            'cancel_url'        => route('billing.index'),
+        ]);
+
+        if ($result['error'] ?? false || empty($result['invoice_url'])) {
+            return response()->json(['success' => false, 'message' => 'Could not start a crypto payment. Please try again later.'], 422);
+        }
+
+        return response()->json(['success' => true, 'invoice_url' => $result['invoice_url']]);
+    }
 }

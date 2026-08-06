@@ -185,6 +185,11 @@ Route::middleware('client.auth')->group(function () {
     Route::post('/billing/{id}/pay/flutterwave/verify', [PaymentController::class, 'verifyFlutterwave'])->name('payment.flutterwave.verify');
     Route::post('/billing/{id}/pay/nowpayments/init',   [PaymentController::class, 'initNowPayments'])->name('payment.nowpayments.init');
 
+    // Fund wallet — same gateways, keyed off the logged-in client's session instead of an invoice id
+    Route::post('/billing/wallet/fund/paystack/verify',    [PaymentController::class, 'fundWalletPaystackVerify'])->name('payment.wallet.paystack.verify');
+    Route::post('/billing/wallet/fund/flutterwave/verify', [PaymentController::class, 'fundWalletFlutterwaveVerify'])->name('payment.wallet.flutterwave.verify');
+    Route::post('/billing/wallet/fund/nowpayments/init',   [PaymentController::class, 'fundWalletNowPaymentsInit'])->name('payment.wallet.nowpayments.init');
+
     // Support
     Route::get('/support',             [SupportController::class, 'index'])->name('support.index');
     Route::get('/support/create',      [SupportController::class, 'create'])->name('support.create');

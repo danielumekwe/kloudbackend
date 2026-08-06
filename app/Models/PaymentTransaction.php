@@ -13,6 +13,7 @@ class PaymentTransaction extends Model
         'gateway_reference',
         'amount',
         'currency',
+        'purpose',
         'status',
         'raw_payload',
     ];

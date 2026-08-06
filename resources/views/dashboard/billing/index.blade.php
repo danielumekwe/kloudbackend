@@ -20,6 +20,38 @@
     @endif
 </div>
 
+{{-- Fund Wallet --}}
+<div class="card mb-6" x-data="fundWallet({{ (float) $ngnRate }}, '{{ $paystackPublicKey }}', '{{ $flutterwavePublicKey }}', '{{ session('email') }}', {{ (int) session('clientId') }})">
+    <h3 class="font-semibold text-slate-900 dark:text-white mb-1">Fund Wallet</h3>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Add funds to your wallet balance. Minimum ₦10,000, maximum ₦5,000,000.</p>
+
+    <div class="max-w-xs">
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Amount (NGN)</label>
+        <input type="number" x-model.number="amount" min="10000" max="5000000" step="100"
+               class="w-full rounded-lg border border-slate-300 dark:border-white/10 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+               placeholder="e.g. 25000">
+        <p class="text-xs text-slate-400 mt-1" x-show="amount > 0" x-text="usdEquivalent"></p>
+        <p class="text-xs text-red-500 mt-1" x-show="amount > 0 && !isValid">Amount must be between ₦10,000 and ₦5,000,000.</p>
+    </div>
+
+    <div x-show="message" class="mt-3 text-sm p-3 rounded-lg max-w-md" :class="success ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400'" x-text="message"></div>
+
+    <div class="flex flex-wrap gap-2 mt-4">
+        <button @click="payWithPaystack()" :disabled="busy || !isValid || !paystackPublicKey" class="btn btn-primary">
+            <span x-show="!busy">Fund with Paystack</span>
+            <span x-show="busy">Processing…</span>
+        </button>
+        <button @click="payWithFlutterwave()" :disabled="busy || !isValid || !flutterwavePublicKey" class="btn btn-secondary">
+            <span x-show="!busy">Fund with Flutterwave</span>
+            <span x-show="busy">Processing…</span>
+        </button>
+        <button @click="payWithCrypto()" :disabled="busy || !isValid" class="btn btn-secondary">
+            <span x-show="!busy">Fund with Crypto</span>
+            <span x-show="busy">Processing…</span>
+        </button>
+    </div>
+</div>
+
 @if($invoices->isEmpty())
     <div class="card text-center py-16">
         <div class="w-16 h-16 mx-auto rounded-2xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mb-4">
@@ -143,3 +175,158 @@
     </div>
 @endif
 @endsection
+
+@push('scripts')
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<script src="https://checkout.flutterwave.com/v3.js"></script>
+<script>
+function fundWallet(ngnRate, paystackPublicKey, flutterwavePublicKey, email, clientId) {
+    return {
+        amount: null,
+        ngnRate,
+        paystackPublicKey,
+        flutterwavePublicKey,
+        email,
+        clientId,
+        busy: false,
+        message: '',
+        success: false,
+
+        get isValid() {
+            return this.amount >= 10000 && this.amount <= 5000000;
+        },
+
+        get usdEquivalent() {
+            if (!this.amount || !this.ngnRate) return '';
+            const usd = this.amount / this.ngnRate;
+            return '≈ $' + usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+
+        payWithPaystack() {
+            if (!this.isValid) return;
+            if (!this.paystackPublicKey || typeof PaystackPop === 'undefined') {
+                this.success = false;
+                this.message = 'Paystack is not available right now. Please try again later.';
+                return;
+            }
+
+            this.busy = true;
+            this.message = '';
+
+            const reference = `kloud101-wallet-${this.clientId}-${Date.now()}`;
+
+            const handler = PaystackPop.setup({
+                key: this.paystackPublicKey,
+                email: this.email,
+                amount: Math.round(this.amount * 100), // smallest currency unit (kobo)
+                currency: 'NGN',
+                ref: reference,
+                metadata: {
+                    purpose: 'wallet',
+                    client_id: this.clientId,
+                },
+                callback: (response) => {
+                    this.verify('paystack', { reference: response.reference });
+                },
+                onClose: () => {
+                    this.busy = false;
+                },
+            });
+
+            handler.openIframe();
+        },
+
+        payWithFlutterwave() {
+            if (!this.isValid) return;
+            if (!this.flutterwavePublicKey || typeof FlutterwaveCheckout === 'undefined') {
+                this.success = false;
+                this.message = 'Flutterwave is not available right now. Please try again later.';
+                return;
+            }
+
+            this.busy = true;
+            this.message = '';
+
+            const txRef = `kloud101-wallet-${this.clientId}-${Date.now()}`;
+
+            FlutterwaveCheckout({
+                public_key: this.flutterwavePublicKey,
+                tx_ref: txRef,
+                amount: this.amount,
+                currency: 'NGN',
+                payment_options: 'card,banktransfer,ussd',
+                customer: { email: this.email },
+                meta: {
+                    purpose: 'wallet',
+                    client_id: this.clientId,
+                },
+                callback: (response) => {
+                    this.verify('flutterwave', { transaction_id: String(response.transaction_id) });
+                },
+                onclose: () => {
+                    this.busy = false;
+                },
+            });
+        },
+
+        async payWithCrypto() {
+            if (!this.isValid) return;
+
+            this.busy = true;
+            this.message = '';
+
+            try {
+                const res = await fetch('/billing/wallet/fund/nowpayments/init', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ amount: this.amount }),
+                });
+                const data = await res.json();
+                if (data.success && data.invoice_url) {
+                    window.open(data.invoice_url, '_blank', 'noopener');
+                    this.success = true;
+                    this.message = 'Crypto payment started — this can take a few minutes to confirm. Your balance will update automatically once it does.';
+                } else {
+                    this.success = false;
+                    this.message = data.message || 'Could not start a crypto payment.';
+                }
+            } catch (e) {
+                this.success = false;
+                this.message = 'Could not reach the server. Please try again.';
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        async verify(gateway, body) {
+            try {
+                const res = await fetch(`/billing/wallet/fund/${gateway}/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                this.success = data.success;
+                this.message = data.message || (data.success ? 'Wallet funded successfully.' : 'Payment could not be confirmed.');
+                if (data.success) {
+                    setTimeout(() => window.location.reload(), 1500);
+                }
+            } catch (e) {
+                this.success = false;
+                this.message = 'Could not reach the server to confirm your payment. If you were charged, please contact support.';
+            } finally {
+                this.busy = false;
+            }
+        },
+    };
+}
+</script>
+@endpush
