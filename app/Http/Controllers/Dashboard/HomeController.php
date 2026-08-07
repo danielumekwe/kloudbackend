@@ -48,6 +48,12 @@ class HomeController extends Controller
 
         $recentActivity = LoginActivity::where('client_id', $clientId)->latest()->take(5)->get();
 
+        // The top "Active Servers" summary card is a total across every product
+        // line — $activeServices above only counts the legacy WHMCS "Servers"
+        // line, so on its own it undercounts (e.g. showed 0 for a client with
+        // 1 active VPS and no legacy service).
+        $totalActiveServices = $activeServices + $vpsActive + $qsActive + $sslActive + $domainsActive + $dedicatedActive;
+
         $serverStatus = [
             'online'  => ServerInstance::where('client_id', $clientId)->where('status', 'active')->count(),
             'offline' => ServerInstance::where('client_id', $clientId)->whereIn('status', ['suspended', 'terminated'])->count(),
@@ -69,6 +75,7 @@ class HomeController extends Controller
             'dedicatedActive',
             'recentActivity',
             'serverStatus',
+            'totalActiveServices',
         ));
     }
 }

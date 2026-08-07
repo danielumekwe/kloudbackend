@@ -51,7 +51,7 @@
         {{-- Summary cards --}}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-            <div class="card flex items-center gap-4">
+            <a href="#services-grid" class="card flex items-center gap-4 hover:shadow-md dark:hover:bg-white/[0.03] transition-shadow">
                 <div class="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                     <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -59,12 +59,12 @@
                     </svg>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ $activeServices }}</p>
+                    <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ $totalActiveServices }}</p>
                     <p class="text-sm text-slate-500 dark:text-slate-400">Active Servers</p>
                 </div>
-            </div>
+            </a>
 
-            <div class="card flex items-center gap-4">
+            <a href="{{ route('billing.index') }}" class="card flex items-center gap-4 hover:shadow-md dark:hover:bg-white/[0.03] transition-shadow">
                 <div class="w-12 h-12 rounded-xl {{ $unpaidInvoices > 0 ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-green-50 dark:bg-green-500/10' }} flex items-center justify-center flex-shrink-0">
                     <svg class="w-6 h-6 {{ $unpaidInvoices > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -75,9 +75,9 @@
                     <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ $unpaidInvoices }}</p>
                     <p class="text-sm text-slate-500 dark:text-slate-400">Unpaid Invoices</p>
                 </div>
-            </div>
+            </a>
 
-            <div class="card flex items-center gap-4">
+            <a href="{{ route('support.index') }}" class="card flex items-center gap-4 hover:shadow-md dark:hover:bg-white/[0.03] transition-shadow">
                 <div class="w-12 h-12 rounded-xl {{ $openTickets > 0 ? 'bg-purple-50 dark:bg-purple-500/10' : 'bg-slate-50 dark:bg-slate-700/40' }} flex items-center justify-center flex-shrink-0">
                     <svg class="w-6 h-6 {{ $openTickets > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -88,11 +88,11 @@
                     <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ $openTickets }}</p>
                     <p class="text-sm text-slate-500 dark:text-slate-400">Open Tickets</p>
                 </div>
-            </div>
+            </a>
         </div>
 
         {{-- Services --}}
-        <div>
+        <div id="services-grid">
             <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Services</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
