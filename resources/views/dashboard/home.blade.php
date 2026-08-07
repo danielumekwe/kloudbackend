@@ -396,6 +396,25 @@
             @endif
         </div>
 
+        {{-- Server status --}}
+        @if($serverStatus['online'] + $serverStatus['offline'] > 0)
+        <div class="card">
+            <p class="text-sm font-semibold text-slate-900 dark:text-white mb-3">Server Status</p>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">{{ $serverStatus['online'] }} Online</span>
+                </div>
+                @if($serverStatus['offline'] > 0)
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300">{{ $serverStatus['offline'] }} Offline</span>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+
         {{-- Wallet / Credit balance --}}
         <div class="card">
             <p class="text-sm font-semibold text-slate-900 dark:text-white mb-1">Wallet</p>

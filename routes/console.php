@@ -15,3 +15,5 @@ Schedule::command('ssl:provision-paid')->everyFiveMinutes();
 Schedule::command('domains:provision-paid')->everyFiveMinutes();
 Schedule::command('domains:provision-paid-renewal')->everyFiveMinutes();
 Schedule::command('provisioning:check-stuck')->everyFiveMinutes();
+Schedule::command('invoices:send-reminders')->daily();
+Schedule::command('servers:collect-metrics')->hourly();

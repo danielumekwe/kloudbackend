@@ -21,6 +21,13 @@ class InterServerService
         try {
             $pending = Http::withHeaders(['X-API-KEY' => $this->apiKey])->timeout(30);
 
+            // Only GET is safe to retry automatically — POST/PUT/PATCH/DELETE here are
+            // mutating (power actions, password resets, purchases) and retrying them
+            // blind risks double-executing a destructive/billable action.
+            if ($method === 'get') {
+                $pending = $pending->retry(2, 500);
+            }
+
             // Passing an empty array explicitly (2 args) makes Laravel set the Guzzle
             // "query" option to [], which *replaces* — rather than leaves alone — any
             // query string already embedded in $path (e.g. "?a=123" built via

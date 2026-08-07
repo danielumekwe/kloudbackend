@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\InvoiceCreated;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Support\CurrencyConverter;
@@ -38,12 +39,15 @@ class InvoiceService
             'tax_rate'       => $taxRate,
             'tax_amount'     => $taxAmount,
             'total'          => $amount + $taxAmount,
+            'due_date'       => now()->addDays(7),
         ]);
 
         $invoice->items()->create([
             'description' => $description,
             'amount'      => $amount,
         ]);
+
+        InvoiceCreated::dispatch($invoice);
 
         return $invoice;
     }

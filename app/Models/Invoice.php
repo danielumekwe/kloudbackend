@@ -16,14 +16,20 @@ class Invoice extends Model
         'total',
         'payment_method',
         'paid_at',
+        'due_date',
+        'reminder_sent_at',
+        'overdue_notified_at',
     ];
 
     protected $casts = [
-        'subtotal'   => 'decimal:2',
-        'tax_rate'   => 'decimal:2',
-        'tax_amount' => 'decimal:2',
-        'total'      => 'decimal:2',
-        'paid_at'    => 'datetime',
+        'subtotal'             => 'decimal:2',
+        'tax_rate'              => 'decimal:2',
+        'tax_amount'             => 'decimal:2',
+        'total'                  => 'decimal:2',
+        'paid_at'                => 'datetime',
+        'due_date'               => 'datetime',
+        'reminder_sent_at'       => 'datetime',
+        'overdue_notified_at'    => 'datetime',
     ];
 
     public function items()

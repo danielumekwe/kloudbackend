@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
+use App\Models\DedicatedServerOrder;
 use App\Models\DomainOrder;
 use App\Models\Invoice;
 use App\Models\PaymentTransaction;
 use App\Models\QsOrder;
+use App\Models\ServerInstance;
 use App\Models\SslOrder;
 use App\Models\VpsOrder;
 use App\Services\TicketService;
@@ -28,7 +31,16 @@ class AdminDashboardController extends Controller
             'pending_orders'      => VpsOrder::where('status', 'pending_payment')->count()
                 + SslOrder::where('status', 'pending_payment')->count()
                 + QsOrder::where('status', 'pending_payment')->count()
-                + DomainOrder::where('status', 'pending_payment')->count(),
+                + DomainOrder::where('status', 'pending_payment')->count()
+                + DedicatedServerOrder::where('status', 'pending_payment')->count(),
+            'provisioning_queue'  => VpsOrder::where('status', 'provisioning')->count()
+                + DedicatedServerOrder::where('status', 'provisioning')->count(),
+            'suspended_servers'   => VpsOrder::where('status', 'suspended')->count()
+                + DedicatedServerOrder::where('status', 'suspended')->count(),
+            'failed_provisioning' => VpsOrder::where('status', 'failed')->count()
+                + DedicatedServerOrder::where('status', 'failed')->count(),
+            'online_servers'      => ServerInstance::where('status', 'active')->count(),
+            'offline_servers'     => ServerInstance::whereIn('status', ['suspended', 'terminated'])->count(),
         ];
 
         // Cached briefly so refreshing the dashboard doesn't re-run these aggregates
@@ -48,10 +60,17 @@ class AdminDashboardController extends Controller
 
         $billingStats['open_tickets'] = $this->tickets->getOpenTicketCount();
 
+        $recentPayments = PaymentTransaction::with('client')->where('status', 'completed')->latest()->limit(5)->get();
+        $recentOrders   = VpsOrder::with('client')->latest()->limit(5)->get();
+        $latestActivity = ActivityLog::latest('created_at')->limit(8)->get();
+
         return view('admin.dashboard', [
-            'stats'        => $stats,
-            'billingStats' => $billingStats,
-            'revenueChart' => $this->dailyRevenueChart(),
+            'stats'           => $stats,
+            'billingStats'    => $billingStats,
+            'revenueChart'    => $this->dailyRevenueChart(),
+            'recentPayments'  => $recentPayments,
+            'recentOrders'    => $recentOrders,
+            'latestActivity'  => $latestActivity,
         ]);
     }
 

@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Concerns\HasObfuscatedCode;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
 
 class Client extends Model
 {
     use HasObfuscatedCode;
+    use Notifiable;
 
     protected $fillable = [
         'email', 'password', 'firstname', 'lastname', 'phonenumber',

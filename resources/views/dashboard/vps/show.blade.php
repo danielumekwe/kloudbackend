@@ -34,11 +34,21 @@
                 @endif
             </p>
         </div>
-        @unless($order->status === 'provisioned')
-        <span class="badge {{ $order->status === 'failed' ? 'badge-suspended' : 'badge-pending' }}">
-            {{ str_replace('_', ' ', $order->status) }}
-        </span>
-        @endunless
+        <div class="flex items-center gap-3">
+            @if($order->status === 'provisioned' && $vpsIp)
+            <button type="button"
+                    onclick="navigator.clipboard.writeText('ssh {{ $instance->root_username ?? 'root' }}@{{ $vpsIp }}{{ ($instance->ssh_port ?? 22) != 22 ? ' -p ' . ($instance->ssh_port ?? 22) : '' }}'); this.dataset.copied=1; this.querySelector('span').textContent='Copied!'; setTimeout(() => this.querySelector('span').textContent='Copy SSH Login', 2000);"
+                    class="btn btn-secondary text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <span>Copy SSH Login</span>
+            </button>
+            @endif
+            @unless($order->status === 'provisioned')
+            <span class="badge {{ $order->status === 'failed' ? 'badge-suspended' : 'badge-pending' }}">
+                {{ str_replace('_', ' ', $order->status) }}
+            </span>
+            @endunless
+        </div>
     </div>
 
     @if($order->status === 'pending_payment')
@@ -213,6 +223,34 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 items-start">
+        {{-- Resource usage --}}
+        <div class="card">
+            <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Resource Usage</h3>
+            @if($metrics->isEmpty())
+            <p class="text-sm text-slate-500 dark:text-slate-400">No usage data collected yet — snapshots are taken hourly.</p>
+            @else
+            <canvas id="usageChart" height="120"></canvas>
+            @endif
+        </div>
+
+        {{-- Billing history --}}
+        <div class="card">
+            <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Billing History</h3>
+            <div class="flex items-center justify-between text-sm p-3 rounded-lg bg-slate-50 dark:bg-white/5 mb-3">
+                <span class="text-slate-600 dark:text-slate-300">Invoice #{{ $order->invoice_id }}</span>
+                <a href="{{ route('billing.show', $order->invoice_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">View →</a>
+            </div>
+            <a href="{{ route('billing.index') }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View all billing history →</a>
+        </div>
+    </div>
+
+    {{-- Activity timeline --}}
+    <div class="card mb-6">
+        <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Activity</h3>
+        @include('partials.activity-timeline', ['activity' => $activity])
+    </div>
+
     {{-- Danger zone --}}
     <div class="card border-red-200 dark:border-red-500/20">
         <h3 class="font-semibold text-slate-900 dark:text-white mb-2">Danger Zone</h3>
@@ -378,6 +416,29 @@
 @endsection
 
 @push('scripts')
+@if($metrics->isNotEmpty())
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('usageChart');
+    if (!canvas || !window.Chart) return;
+    new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: @json($metrics->pluck('recorded_at')->map(fn($d) => $d->format('M j g:iA'))),
+            datasets: [{
+                label: 'Bandwidth (GB)',
+                data: @json($metrics->pluck('bandwidth_usage_gb')),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59,130,246,0.1)',
+                fill: true,
+                tension: 0.3,
+            }],
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+});
+</script>
+@endif
 <script>
 function vpsManage(orderId) {
     return {

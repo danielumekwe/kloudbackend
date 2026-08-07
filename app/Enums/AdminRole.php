@@ -42,4 +42,15 @@ enum AdminRole: string
     {
         return in_array($this, [self::SuperAdmin, self::SupportAgent], true);
     }
+
+    /**
+     * Gates the newer, higher-risk server-management actions (backups, RDNS,
+     * VNC, resize, etc.) added alongside Server Management — the pre-existing
+     * admin.services.* routes stay ungated as before, so no admin loses access
+     * they already had.
+     */
+    public function canManageVps(): bool
+    {
+        return in_array($this, [self::SuperAdmin, self::VpsManager], true);
+    }
 }

@@ -9,6 +9,7 @@ use App\Models\DomainOrder;
 use App\Models\Invoice;
 use App\Models\LoginActivity;
 use App\Models\QsOrder;
+use App\Models\ServerInstance;
 use App\Models\SslOrder;
 use App\Models\VpsOrder;
 use App\Services\TicketService;
@@ -47,6 +48,11 @@ class HomeController extends Controller
 
         $recentActivity = LoginActivity::where('client_id', $clientId)->latest()->take(5)->get();
 
+        $serverStatus = [
+            'online'  => ServerInstance::where('client_id', $clientId)->where('status', 'active')->count(),
+            'offline' => ServerInstance::where('client_id', $clientId)->whereIn('status', ['suspended', 'terminated'])->count(),
+        ];
+
         return view('dashboard.home', compact(
             'services',
             'activeServices',
@@ -62,6 +68,7 @@ class HomeController extends Controller
             'domainsActive',
             'dedicatedActive',
             'recentActivity',
+            'serverStatus',
         ));
     }
 }

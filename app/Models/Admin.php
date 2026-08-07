@@ -4,10 +4,13 @@ namespace App\Models;
 
 use App\Enums\AdminRole;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
 
 class Admin extends Model
 {
+    use Notifiable;
+
     protected $fillable = [
         'email', 'password', 'role',
         'two_factor_secret', 'two_factor_recovery_codes', 'two_factor_confirmed_at',

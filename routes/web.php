@@ -6,6 +6,8 @@ use App\Http\Controllers\Admin\AdminBillingSettingsController;
 use App\Http\Controllers\Admin\AdminCommunicationsController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminClientController;
+use App\Http\Controllers\Admin\AdminEmailLogsController;
+use App\Http\Controllers\Admin\AdminNotificationsController;
 use App\Http\Controllers\Admin\AdminInvoicesController;
 use App\Http\Controllers\Admin\AdminOrdersController;
 use App\Http\Controllers\Admin\AdminPaymentSettingsController;
@@ -27,6 +29,7 @@ use App\Http\Controllers\Dashboard\CurrencyController;
 use App\Http\Controllers\Dashboard\DedicatedServerController;
 use App\Http\Controllers\Dashboard\DomainsController;
 use App\Http\Controllers\Dashboard\HomeController;
+use App\Http\Controllers\Dashboard\NotificationsController;
 use App\Http\Controllers\Dashboard\PaymentController;
 use App\Http\Controllers\Dashboard\ProductController;
 use App\Http\Controllers\Dashboard\ProfileController;
@@ -205,6 +208,11 @@ Route::middleware('client.auth')->group(function () {
 
     // Currency switcher
     Route::post('/currency', [CurrencyController::class, 'store'])->name('currency.store');
+
+    // In-app notification bell
+    Route::get('/notifications',           [NotificationsController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationsController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationsController::class, 'markAllRead'])->name('notifications.read-all');
 });
 
 // -------------------------------------------------------------------------
@@ -253,7 +261,19 @@ Route::prefix('admin')->group(function () {
                 Route::post('/{order}/reinstall',  [AdminServicesController::class, 'vpsReinstallOs'])->name('admin.services.vps.reinstall-os');
                 Route::post('/{order}/console',    [AdminServicesController::class, 'vpsConsole'])->name('admin.services.vps.console');
                 Route::post('/{order}/cancel',     [AdminServicesController::class, 'vpsCancel'])->name('admin.services.vps.cancel');
+                Route::post('/{order}/action',     [AdminServicesController::class, 'vpsAction'])->name('admin.services.vps.action');
             });
+
+            Route::prefix('dedicated')->group(function () {
+                Route::get('/{order}',             [AdminServicesController::class, 'showDedicated'])->name('admin.services.dedicated.show');
+                Route::post('/{order}/suspend',    [AdminServicesController::class, 'dedicatedSuspend'])->name('admin.services.dedicated.suspend');
+                Route::post('/{order}/unsuspend',  [AdminServicesController::class, 'dedicatedUnsuspend'])->name('admin.services.dedicated.unsuspend');
+                Route::post('/{order}/cancel',     [AdminServicesController::class, 'dedicatedCancel'])->name('admin.services.dedicated.cancel');
+            });
+
+            Route::post('/{orderType}/{orderId}/renew', [AdminServicesController::class, 'renew'])
+                ->where('orderType', 'vps|dedicated')
+                ->name('admin.services.renew');
 
             Route::prefix('qs')->group(function () {
                 Route::get('/{order}',             [AdminServicesController::class, 'showQs'])->name('admin.services.qs.show');
@@ -271,6 +291,14 @@ Route::prefix('admin')->group(function () {
         // Communications
         Route::get('/communications/newsletter',       [AdminCommunicationsController::class, 'newsletter'])->name('admin.communications.newsletter');
         Route::post('/communications/newsletter/send', [AdminCommunicationsController::class, 'sendNewsletter'])->name('admin.communications.newsletter.send');
+
+        Route::get('/email-logs',              [AdminEmailLogsController::class, 'index'])->name('admin.email-logs.index');
+        Route::post('/email-logs/{emailLog}/resend', [AdminEmailLogsController::class, 'resend'])->name('admin.email-logs.resend');
+
+        // In-app notification bell
+        Route::get('/notifications',                [AdminNotificationsController::class, 'index'])->name('admin.notifications.index');
+        Route::post('/notifications/{id}/read',      [AdminNotificationsController::class, 'markRead'])->name('admin.notifications.read');
+        Route::post('/notifications/read-all',       [AdminNotificationsController::class, 'markAllRead'])->name('admin.notifications.read-all');
 
         Route::middleware('admin.role:super_admin,finance_manager')->group(function () {
             Route::get('/pricing',  [AdminPricingController::class, 'index'])->name('admin.pricing');
@@ -294,6 +322,7 @@ Route::prefix('admin')->group(function () {
                 Route::post('/{id}/mark-paid',     [AdminInvoicesController::class, 'markPaid'])->name('admin.invoices.mark-paid');
                 Route::post('/{id}/mark-pending',  [AdminInvoicesController::class, 'markPending'])->name('admin.invoices.mark-pending');
                 Route::post('/{id}/cancel',        [AdminInvoicesController::class, 'cancel'])->name('admin.invoices.cancel');
+                Route::post('/{id}/refund',        [AdminInvoicesController::class, 'refund'])->name('admin.invoices.refund');
             });
 
             Route::get('/transactions', [AdminTransactionsController::class, 'index'])->name('admin.transactions.index');

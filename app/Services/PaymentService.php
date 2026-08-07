@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\InvoicePaid;
 use App\Mail\InvoicePaidMail;
 use App\Models\Client;
 use App\Models\Invoice;
@@ -95,6 +96,8 @@ class PaymentService
                 paidAt: $invoice->paid_at->format('M j, Y \a\t g:i A'),
             ));
         }
+
+        InvoicePaid::dispatch($invoice);
 
         return ['success' => true, 'message' => 'Payment recorded.'];
     }

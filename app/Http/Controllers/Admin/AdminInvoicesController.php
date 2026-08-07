@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\InvoicePaid;
 use App\Http\Controllers\Controller;
+use App\Mail\InvoiceCancelledMail;
 use App\Mail\InvoicePaidMail;
+use App\Mail\InvoiceRefundedMail;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Services\InvoiceService;
@@ -94,6 +97,8 @@ class AdminInvoicesController extends Controller
             ));
         }
 
+        InvoicePaid::dispatch($invoice);
+
         return back()->with('success', 'Invoice #' . $id . ' marked as paid.');
     }
 
@@ -112,7 +117,7 @@ class AdminInvoicesController extends Controller
 
     public function cancel(int $id): RedirectResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        $invoice = Invoice::with('client')->findOrFail($id);
 
         if ($invoice->status === 'paid') {
             return back()->with('error', 'Cannot cancel a paid invoice.');
@@ -120,6 +125,42 @@ class AdminInvoicesController extends Controller
 
         $invoice->update(['status' => 'cancelled']);
 
+        if ($invoice->client) {
+            Mail::to($invoice->client->email)->send(new InvoiceCancelledMail(
+                firstName: $invoice->client->firstname,
+                invoiceId: $invoice->id,
+                amount: (float) $invoice->total,
+                currency: $invoice->currency_code,
+            ));
+        }
+
         return back()->with('success', 'Invoice #' . $id . ' cancelled.');
+    }
+
+    /**
+     * Marks a paid invoice as refunded — bookkeeping only, no gateway-side
+     * reversal is triggered here (each gateway's dashboard remains the
+     * authoritative place to actually reverse the charge).
+     */
+    public function refund(int $id): RedirectResponse
+    {
+        $invoice = Invoice::with('client')->findOrFail($id);
+
+        if ($invoice->status !== 'paid') {
+            return back()->with('error', 'Only paid invoices can be refunded.');
+        }
+
+        $invoice->update(['status' => 'refunded']);
+
+        if ($invoice->client) {
+            Mail::to($invoice->client->email)->send(new InvoiceRefundedMail(
+                firstName: $invoice->client->firstname,
+                invoiceId: $invoice->id,
+                amount: (float) $invoice->total,
+                currency: $invoice->currency_code,
+            ));
+        }
+
+        return back()->with('success', 'Invoice #' . $id . ' marked as refunded.');
     }
 }

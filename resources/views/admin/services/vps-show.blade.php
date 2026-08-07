@@ -20,15 +20,8 @@
 @endif
 
 @php
-    $badgeClass = match($order->status) {
-        'provisioned'  => 'badge-active',
-        'suspended'    => 'badge-answered',
-        'failed'       => 'badge-suspended',
-        'cancelled'    => 'badge-closed',
-        default        => 'badge-open',
-    };
     $hostname = $order->config['hostname'] ?? 'VPS #' . $order->id;
-    $ip       = $liveData['ip'] ?? $liveData['main_ip'] ?? null;
+    $ip       = $instance->ipv4 ?? $liveData['ip'] ?? $liveData['main_ip'] ?? null;
 @endphp
 
 {{-- Header --}}
@@ -37,7 +30,9 @@
         <div>
             <div class="flex items-center gap-3 flex-wrap">
                 <h1 class="text-lg font-semibold text-slate-900 dark:text-white">{{ $hostname }}</h1>
-                <span class="badge {{ $badgeClass }}">{{ $order->status }}</span>
+                <span class="badge px-2.5 py-1 rounded-full text-xs font-medium {{ \App\Support\OrderStatusBadge::classes($order->status) }}">
+                    {{ \App\Support\OrderStatusBadge::label($order->status) }}
+                </span>
             </div>
             @if($order->client)
             <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -94,6 +89,68 @@
             <p class="text-xs text-slate-400">Ordered</p>
             <p class="text-slate-700 dark:text-slate-300 mt-0.5">{{ $order->created_at->format('M j, Y') }}</p>
         </div>
+        <div>
+            <p class="text-xs text-slate-400">Next Renewal</p>
+            <p class="text-slate-700 dark:text-slate-300 mt-0.5">{{ $instance?->renewal_at?->format('M j, Y') ?? '—' }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-slate-400">SSH Port</p>
+            <p class="text-slate-700 dark:text-slate-300 mt-0.5 font-mono">{{ $instance->ssh_port ?? 22 }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-slate-400">Root Username</p>
+            <p class="text-slate-700 dark:text-slate-300 mt-0.5 font-mono">{{ $instance->root_username ?? 'root' }}</p>
+        </div>
+        @if($instance?->decryptedRootPassword())
+        <div x-data="{ show: false }">
+            <p class="text-xs text-slate-400">Root Password</p>
+            <p class="text-slate-700 dark:text-slate-300 mt-0.5 font-mono flex items-center gap-2">
+                <span x-show="!show">••••••••••••</span>
+                <span x-show="show" x-cloak>{{ $instance->decryptedRootPassword() }}</span>
+                <button type="button" @click="show = !show" class="text-xs text-blue-600 dark:text-blue-400 hover:underline" x-text="show ? 'Hide' : 'Reveal'"></button>
+            </p>
+        </div>
+        @endif
+    </div>
+</div>
+
+{{-- Network --}}
+<div class="card mb-6">
+    <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Network</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div>
+            <p class="text-xs text-slate-400 mb-1">Reverse DNS</p>
+            @if($order->interserver_vps_id && $order->status === 'provisioned')
+            <form method="POST" action="{{ route('admin.services.vps.action', $order) }}" class="flex gap-2">
+                @csrf
+                <input type="hidden" name="command" value="reversedns">
+                <input type="text" name="ips[]" placeholder="hostname.example.com" class="form-input text-sm flex-1">
+                <button type="submit" class="btn btn-secondary text-sm flex-shrink-0">Set</button>
+            </form>
+            @else
+            <p class="text-slate-400">Unavailable until provisioned.</p>
+            @endif
+        </div>
+        <div>
+            <p class="text-xs text-slate-400 mb-1">Additional IPs</p>
+            @if($order->interserver_vps_id && $order->status === 'provisioned')
+            <form method="POST" action="{{ route('admin.services.vps.action', $order) }}">
+                @csrf
+                <input type="hidden" name="command" value="buyip">
+                <button type="submit" class="btn btn-secondary text-sm">Purchase Additional IP</button>
+            </form>
+            @else
+            <p class="text-slate-400">Unavailable until provisioned.</p>
+            @endif
+        </div>
+        <div>
+            <p class="text-xs text-slate-400 mb-1">Firewall Status</p>
+            <button type="button" disabled title="Not available via InterServer API" class="btn btn-secondary text-sm opacity-50 cursor-not-allowed">Manage Firewall</button>
+        </div>
+        <div>
+            <p class="text-xs text-slate-400 mb-1">DDoS Protection</p>
+            <button type="button" disabled title="Not available via InterServer API" class="btn btn-secondary text-sm opacity-50 cursor-not-allowed">View Status</button>
+        </div>
     </div>
 </div>
 
@@ -124,6 +181,12 @@
         {{-- Console access --}}
         <form method="POST" action="{{ route('admin.services.vps.console', $order) }}">@csrf
             <button type="submit" class="btn btn-secondary text-sm">Open Console (No Password)</button>
+        </form>
+
+        <button type="button" disabled title="Not available via InterServer API" class="btn btn-secondary text-sm opacity-50 cursor-not-allowed">Boot Rescue Mode</button>
+
+        <form method="POST" action="{{ route('admin.services.renew', ['orderType' => 'vps', 'orderId' => $order->id]) }}">@csrf
+            <button type="submit" class="btn btn-secondary text-sm">Renew</button>
         </form>
 
         {{-- Cancel --}}
@@ -192,5 +255,11 @@
 </div>
 @endif
 @endif
+
+{{-- Activity --}}
+<div class="card">
+    <h3 class="font-semibold text-slate-900 dark:text-white mb-4">Activity</h3>
+    @include('partials.activity-timeline', ['activity' => $activity])
+</div>
 
 @endsection

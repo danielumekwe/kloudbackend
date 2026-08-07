@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Dashboard;
 
+use App\Events\ServerActionPerformed;
 use App\Http\Controllers\Controller;
 use App\Mail\OrderConfirmationMail;
 use App\Models\Client;
+use App\Models\ServerInstance;
 use App\Models\VpsOrder;
 use App\Services\InterServerService;
 use App\Services\InvoiceService;
@@ -250,7 +252,24 @@ class VpsController extends Controller
             $live = $this->interserver->getVps($order->interserver_vps_id);
         }
 
-        return view('dashboard.vps.show', compact('order', 'live'));
+        $instance = ServerInstance::where('orderable_type', VpsOrder::class)->where('orderable_id', $order->id)->first();
+
+        $activity = \App\Models\ActivityLog::where('subject_type', VpsOrder::class)
+            ->where('subject_id', $order->id)
+            ->where('visible_to_client', true)
+            ->latest('created_at')
+            ->limit(50)
+            ->get();
+
+        $metrics = \App\Models\ServerMetric::where('orderable_type', VpsOrder::class)
+            ->where('orderable_id', $order->id)
+            ->latest('recorded_at')
+            ->limit(30)
+            ->get()
+            ->reverse()
+            ->values();
+
+        return view('dashboard.vps.show', compact('order', 'live', 'instance', 'activity', 'metrics'));
     }
 
     /**
@@ -350,7 +369,14 @@ class VpsController extends Controller
 
         if ($request->command === 'cancel') {
             $order->update(['status' => 'cancelled']);
+            ServerInstance::where('orderable_type', VpsOrder::class)->where('orderable_id', $order->id)
+                ->update(['status' => 'terminated']);
         }
+
+        // Sensitive commands stay out of the client-visible timeline; routine
+        // lifecycle actions (start/stop/restart/cancel) are shown to the customer.
+        $clientVisible = in_array($request->command, ['start', 'stop', 'restart', 'cancel'], true);
+        event(new ServerActionPerformed($order, $request->command, "You ran \"{$request->command}\" on the VPS.", [], $clientVisible));
 
         return response()->json(['success' => true, 'message' => $result['text'] ?? 'Action completed successfully.', 'data' => $result]);
     }

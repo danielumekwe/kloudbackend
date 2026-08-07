@@ -41,6 +41,10 @@
         <p class="text-xl font-bold text-green-600 dark:text-green-400">{{ $stats['domain_active'] }}</p>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Active Domains</p>
     </div>
+    <div class="card text-center">
+        <p class="text-xl font-bold text-green-600 dark:text-green-400">{{ $stats['dedicated_active'] }}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Active Dedicated</p>
+    </div>
 </div>
 
 {{-- Filters --}}
@@ -49,10 +53,11 @@
         <div class="flex items-center gap-2">
             <label class="text-sm text-slate-500 dark:text-slate-400">Type:</label>
             <select name="type" class="form-input py-1.5 text-sm">
-                <option value="vps"    @selected($type === 'vps')>VPS</option>
-                <option value="qs"     @selected($type === 'qs')>Quick Server</option>
-                <option value="ssl"    @selected($type === 'ssl')>SSL</option>
-                <option value="domain" @selected($type === 'domain')>Domain</option>
+                <option value="vps"       @selected($type === 'vps')>VPS</option>
+                <option value="qs"        @selected($type === 'qs')>Quick Server</option>
+                <option value="ssl"       @selected($type === 'ssl')>SSL</option>
+                <option value="domain"    @selected($type === 'domain')>Domain</option>
+                <option value="dedicated" @selected($type === 'dedicated')>Dedicated Server</option>
             </select>
         </div>
         <div class="flex items-center gap-2">
@@ -71,9 +76,12 @@
 </div>
 
 @php
-    $items = $vps->isNotEmpty() ? $vps : ($qs->isNotEmpty() ? $qs : ($ssl->isNotEmpty() ? $ssl : $domain));
-    $isVps = $type === 'vps';
-    $isQs  = $type === 'qs';
+    $items = match($type) {
+        'qs' => $qs, 'ssl' => $ssl, 'domain' => $domain, 'dedicated' => $dedicated, default => $vps,
+    };
+    $isVps       = $type === 'vps';
+    $isQs        = $type === 'qs';
+    $isDedicated = $type === 'dedicated';
 @endphp
 
 @if($items->isEmpty())
@@ -97,10 +105,12 @@
             default        => 'badge-open',
         };
         $detailRoute = $isVps ? route('admin.services.vps.show', $svc)
-                     : ($isQs  ? route('admin.services.qs.show', $svc) : null);
+                     : ($isQs  ? route('admin.services.qs.show', $svc)
+                     : ($isDedicated ? route('admin.services.dedicated.show', $svc) : null));
         $desc = $isVps ? ($svc->config['hostname'] ?? $svc->config['plan_name'] ?? 'VPS')
               : ($isQs  ? ($svc->config['plan_name'] ?? 'Quick Server')
-              : ($type === 'ssl' ? ($svc->config['domain'] ?? 'SSL') : ($svc->domain_name . '.' . $svc->tld)));
+              : ($isDedicated ? ($svc->config['hostname'] ?? 'Dedicated Server')
+              : ($type === 'ssl' ? ($svc->config['domain'] ?? 'SSL') : ($svc->domain_name . '.' . $svc->tld))));
     @endphp
     <div class="card">
         <div class="flex items-start justify-between gap-3 mb-2">
@@ -128,8 +138,7 @@
                     <th>#</th>
                     <th>Description</th>
                     <th>Client</th>
-                    @if($isVps)<th>InterServer ID</th>@endif
-                    @if($isQs)<th>InterServer ID</th>@endif
+                    @if($isVps || $isQs || $isDedicated)<th>InterServer ID</th>@endif
                     <th>Price</th>
                     <th>Status</th>
                     <th>Created</th>
@@ -150,10 +159,12 @@
                     };
                     $desc = $isVps ? ($svc->config['hostname'] ?? $svc->config['plan_name'] ?? 'VPS')
                           : ($isQs  ? ($svc->config['plan_name'] ?? 'Quick Server')
-                          : ($type === 'ssl' ? ($svc->config['domain'] ?? 'SSL') : ($svc->domain_name . '.' . $svc->tld)));
+                          : ($isDedicated ? ($svc->config['hostname'] ?? 'Dedicated Server')
+                          : ($type === 'ssl' ? ($svc->config['domain'] ?? 'SSL') : ($svc->domain_name . '.' . $svc->tld))));
                     $detailRoute = $isVps ? route('admin.services.vps.show', $svc)
-                                 : ($isQs  ? route('admin.services.qs.show', $svc) : null);
-                    $serverId = $isVps ? $svc->interserver_vps_id : ($isQs ? $svc->interserver_qs_id : null);
+                                 : ($isQs  ? route('admin.services.qs.show', $svc)
+                                 : ($isDedicated ? route('admin.services.dedicated.show', $svc) : null));
+                    $serverId = $isVps ? $svc->interserver_vps_id : ($isQs ? $svc->interserver_qs_id : ($isDedicated ? $svc->interserver_server_id : null));
                 @endphp
                 <tr>
                     <td class="font-mono text-xs text-slate-500">#{{ $svc->id }}</td>
@@ -167,7 +178,7 @@
                         @else —
                         @endif
                     </td>
-                    @if($isVps || $isQs)
+                    @if($isVps || $isQs || $isDedicated)
                     <td class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ $serverId ?? '—' }}</td>
                     @endif
                     <td class="text-slate-700 dark:text-slate-300">${{ number_format((float)$svc->price, 2) }}</td>

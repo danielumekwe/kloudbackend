@@ -550,6 +550,63 @@
                         </div>
                     </div>
 
+                    {{-- Notification bell --}}
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open"
+                                class="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors"
+                                title="Notifications">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            @php($unreadCount = $bellNotifications->whereNull('read_at')->count())
+                            @if($unreadCount > 0)
+                            <span class="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                                {{ $unreadCount > 9 ? '9+' : $unreadCount }}
+                            </span>
+                            @endif
+                        </button>
+
+                        <div x-show="open"
+                             @click.outside="open = false"
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 scale-100"
+                             x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-800 rounded-xl shadow-xl
+                                    border border-slate-200 dark:border-white/[0.08] py-2 z-10 origin-top-right">
+                            <div class="px-4 pb-2 flex items-center justify-between border-b border-slate-100 dark:border-white/[0.06]">
+                                <span class="text-sm font-semibold text-slate-900 dark:text-white">Notifications</span>
+                                @if($unreadCount > 0)
+                                <form method="POST" action="{{ route('notifications.read-all') }}">
+                                    @csrf
+                                    <button type="submit" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Mark all read</button>
+                                </form>
+                                @endif
+                            </div>
+                            @if($bellNotifications->isEmpty())
+                                <p class="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">No notifications yet.</p>
+                            @else
+                                <div class="max-h-80 overflow-y-auto">
+                                    @foreach($bellNotifications as $n)
+                                    <div class="flex items-start gap-2 px-4 py-2.5 text-sm {{ $n->read_at ? '' : 'bg-blue-50/50 dark:bg-blue-500/[0.06]' }}">
+                                        <span class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                                              :class="'{{ $n->data['severity'] ?? 'info' }}' === 'critical' ? 'bg-red-500' : ('{{ $n->data['severity'] ?? 'info' }}' === 'warning' ? 'bg-amber-500' : 'bg-blue-500')"></span>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="font-medium text-slate-900 dark:text-white">{{ $n->data['title'] ?? 'Notification' }}</p>
+                                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ $n->data['message'] ?? '' }}</p>
+                                        </div>
+                                    </div>
+                                    @endforeach
+                                </div>
+                                <div class="px-4 pt-2">
+                                    <a href="{{ route('notifications.index') }}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">View all</a>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
                     @if(config('app.multi_currency_enabled'))
                     {{-- Currency switcher --}}
                     <div class="relative" x-data="{ open: false }">

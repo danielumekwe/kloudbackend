@@ -2,26 +2,28 @@
 
 namespace App\Console\Commands;
 
-use App\Mail\VpsFailedMail;
-use App\Mail\VpsProvisionedMail;
-use App\Models\Client;
+use App\Jobs\ProvisionServerOrder;
 use App\Models\DedicatedServerOrder;
 use App\Models\Invoice;
-use App\Services\InterServerService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Throwable;
 
+/**
+ * See ProvisionPaidVps — same synchronous safety-net sweep, for Dedicated
+ * Server orders. Runs the provisioning job inline (dispatchSync), so it
+ * works whether or not a queue worker is running in production.
+ */
 #[Signature('dedicated:provision-paid')]
-#[Description('Check pending Dedicated Server orders for paid invoices and provision them on InterServer')]
+#[Description('Sweep for paid-but-not-yet-provisioned Dedicated Server orders and provision them (runs inline, no queue worker required)')]
 class ProvisionPaidDedicated extends Command
 {
-    public function handle(InterServerService $interserver): int
+    public function handle(): int
     {
         $pending = DedicatedServerOrder::where('status', 'pending_payment')->get();
+        $provisioned = 0;
 
         foreach ($pending as $order) {
             $invoice = Invoice::find($order->invoice_id);
@@ -30,62 +32,15 @@ class ProvisionPaidDedicated extends Command
                 continue;
             }
 
-            $config = $order->config;
-
-            // Claim before calling out — see ProvisionPaidDomain for why.
-            $order->update(['status' => 'provisioning']);
-
-            $result = $interserver->placeBuyNowOrder((int) $config['asset_id'], [
-                'hostname'       => $config['hostname'],
-                'enablepassword' => true,
-                'rootPassword'   => Crypt::decryptString($config['rootpass']),
-                'os'             => $config['os'] ?? null,
-                'bandwidth'      => $config['bandwidth'] ?? null,
-                'ips'            => $config['ips'] ?? null,
-                'cp'             => $config['cp'] ?? null,
-                'raid'           => $config['raid'] ?? null,
-                'comments'       => $config['comment'] ?? '',
-            ]);
-
-            $client   = Client::find($order->client_id);
-            $planName = $config['listing']['cpu'][0] ?? 'Dedicated Server';
-
-            if ($result['success'] ?? false) {
-                $order->update([
-                    'status'                 => 'provisioned',
-                    'interserver_server_id'  => $result['order_details']['service_id'] ?? null,
-                ]);
-                $this->info("Provisioned Dedicated Server order #{$order->id} -> InterServer server_id " . ($result['order_details']['service_id'] ?? 'unknown'));
-
-                if ($client) {
-                    Mail::to($client->email)->send(new VpsProvisionedMail(
-                        firstName:  $client->firstname,
-                        hostname:   $config['hostname'],
-                        planName:   $planName,
-                        orderId:    $order->id,
-                        invoiceId:  $order->invoice_id,
-                    ));
-                }
-            } else {
-                $failureReason = $result['text'] ?? (implode(' ', $result['errors'] ?? []) ?: json_encode($result));
-
-                $order->update([
-                    'status'         => 'failed',
-                    'failure_reason' => $failureReason,
-                ]);
-                Log::error("Dedicated Server auto-provision failed for order #{$order->id}", $result);
-                $this->error("Failed to provision Dedicated Server order #{$order->id}: " . ($result['text'] ?? 'unknown error'));
-
-                if ($client) {
-                    Mail::to($client->email)->send(new VpsFailedMail(
-                        firstName:  $client->firstname,
-                        planName:   $planName,
-                        orderId:    $order->id,
-                        invoiceId:  $order->invoice_id,
-                    ));
-                }
+            try {
+                ProvisionServerOrder::dispatchSync($order);
+                $provisioned++;
+            } catch (Throwable $e) {
+                Log::error("Provisioning sweep failed for Dedicated Server order #{$order->id}", ['error' => $e->getMessage()]);
             }
         }
+
+        $this->info("Processed {$provisioned} Dedicated Server order(s).");
 
         return self::SUCCESS;
     }

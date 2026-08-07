@@ -2,26 +2,34 @@
 
 namespace App\Console\Commands;
 
-use App\Mail\VpsFailedMail;
-use App\Mail\VpsProvisionedMail;
-use App\Models\Client;
+use App\Jobs\ProvisionServerOrder;
 use App\Models\Invoice;
 use App\Models\VpsOrder;
-use App\Services\InterServerService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Throwable;
 
+/**
+ * Provisioning is normally triggered instantly by App\Listeners\
+ * DispatchProvisioningOnInvoicePaid the moment an invoice is marked paid,
+ * via a real queued dispatch (fast, but only runs once a queue worker picks
+ * it up). This command is the 5-minute safety-net sweep — it runs the same
+ * job SYNCHRONOUSLY (dispatchSync), so every paid order is guaranteed to be
+ * provisioned within 5 minutes even if no queue worker is running at all.
+ * Only orders still 'pending_payment' are picked up here — anything already
+ * claimed ('provisioning') by an instant dispatch is left alone, so there's
+ * no double-provisioning race between the two paths.
+ */
 #[Signature('vps:provision-paid')]
-#[Description('Check pending VPS orders for paid invoices and provision them on InterServer')]
+#[Description('Sweep for paid-but-not-yet-provisioned VPS orders and provision them (runs inline, no queue worker required)')]
 class ProvisionPaidVps extends Command
 {
-    public function handle(InterServerService $interserver): int
+    public function handle(): int
     {
         $pending = VpsOrder::where('status', 'pending_payment')->get();
+        $provisioned = 0;
 
         foreach ($pending as $order) {
             $invoice = Invoice::find($order->invoice_id);
@@ -30,60 +38,18 @@ class ProvisionPaidVps extends Command
                 continue;
             }
 
-            $config = $order->config;
-
-            // Claim before calling out — see ProvisionPaidDomain for why.
-            $order->update(['status' => 'provisioning']);
-
-            $result = $interserver->placeOrder([
-                'vpsPlatform'  => $config['platform'],
-                'osDistro'     => $config['osDistro'],
-                'osVersion'    => $config['osVersion'],
-                'slices'       => $config['slices'],
-                'location'     => $config['location'],
-                'period'       => $config['period'],
-                'controlpanel' => $config['controlpanel'],
-                'hostname'     => $config['hostname'],
-                'rootpass'     => Crypt::decryptString($config['rootpass']),
-            ]);
-
-            $client  = Client::find($order->client_id);
-            $planName = $config['plan_name'] ?? ($config['platform'] ?? 'VPS');
-
-            if ($result['success'] ?? false) {
-                $order->update([
-                    'status'             => 'provisioned',
-                    'interserver_vps_id' => $result['serviceid'],
-                ]);
-                $this->info("Provisioned VPS order #{$order->id} -> InterServer vps_id {$result['serviceid']}");
-
-                if ($client) {
-                    Mail::to($client->email)->send(new VpsProvisionedMail(
-                        firstName:  $client->firstname,
-                        hostname:   $config['hostname'] ?? 'your server',
-                        planName:   $planName,
-                        orderId:    $order->id,
-                        invoiceId:  $order->invoice_id,
-                    ));
-                }
-            } else {
-                $order->update([
-                    'status'         => 'failed',
-                    'failure_reason' => $result['message'] ?? json_encode($result),
-                ]);
-                Log::error("VPS auto-provision failed for order #{$order->id}", $result);
-                $this->error("Failed to provision VPS order #{$order->id}: " . ($result['message'] ?? 'unknown error'));
-
-                if ($client) {
-                    Mail::to($client->email)->send(new VpsFailedMail(
-                        firstName:  $client->firstname,
-                        planName:   $planName,
-                        orderId:    $order->id,
-                        invoiceId:  $order->invoice_id,
-                    ));
-                }
+            try {
+                ProvisionServerOrder::dispatchSync($order);
+                $provisioned++;
+            } catch (Throwable $e) {
+                // The job's own failed() handler already marked the order 'failed'
+                // and notified the client/admin — this just keeps the sweep loop
+                // going so one bad order doesn't block the rest.
+                Log::error("Provisioning sweep failed for VPS order #{$order->id}", ['error' => $e->getMessage()]);
             }
         }
+
+        $this->info("Processed {$provisioned} VPS order(s).");
 
         return self::SUCCESS;
     }
