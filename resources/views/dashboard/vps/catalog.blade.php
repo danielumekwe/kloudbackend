@@ -22,6 +22,9 @@
         maxSlices: {{ $maxSlices }},
         recommendedMinSlices: {{ $recommendedMinSlices }},
         pricePerSlice: {{ $pricePerSlice }},
+        sliceStorageGb: {{ $sliceStorageGb }},
+        sliceRamGb: {{ $sliceRamGb }},
+        sliceBandwidthGb: {{ $sliceBandwidthGb }},
      })">
 
 {{-- Step indicator --}}
@@ -642,9 +645,9 @@ function vpsOrder(opts) {
         recommendedMinSlices: opts.recommendedMinSlices,
         pricePerSlice: opts.pricePerSlice,
 
-        sliceStorageGb: 40,
-        sliceRamGb: 2,
-        sliceBandwidthGb: 2000,
+        sliceStorageGb: opts.sliceStorageGb,
+        sliceRamGb: opts.sliceRamGb,
+        sliceBandwidthGb: opts.sliceBandwidthGb,
 
         osDistro: '',
         osVersion: '',

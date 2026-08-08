@@ -93,6 +93,14 @@ class VpsController extends Controller
         $recommendedMinSlices = (int) ($plan['recommended_min_slices'] ?? $minSlices);
         $periods    = config('vps_pricing.period_months');
 
+        // InterServer gives Storage VPS its own much larger per-slice disk
+        // allocation (hdStorageSlice) — every other platform uses hdSlice.
+        $sliceStorageGb    = (int) ($plan['platform'] === 'kvmstorage'
+            ? ($catalogData['hdStorageSlice'] ?? 1000)
+            : ($catalogData['hdSlice'] ?? 40));
+        $sliceRamGb        = (int) round(($catalogData['ramSlice'] ?? 2048) / 1024);
+        $sliceBandwidthGb  = (int) ($catalogData['bwSlice'] ?? 2000);
+
         $currencyCode = session('currency', 'USD');
         $currency     = CurrencyConverter::find($currencyCode) ?? CurrencyConverter::default();
 
@@ -106,6 +114,7 @@ class VpsController extends Controller
         return view('dashboard.vps.catalog', compact(
             'category', 'plan', 'locations', 'stock', 'osNames', 'templates',
             'maxSlices', 'minSlices', 'recommendedMinSlices', 'controlpanelOptions', 'periods', 'currency', 'pricePerSlice',
+            'sliceStorageGb', 'sliceRamGb', 'sliceBandwidthGb',
         ));
     }
 
