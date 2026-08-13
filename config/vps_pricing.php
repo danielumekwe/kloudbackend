@@ -69,7 +69,7 @@ return [
             'price_per_slice' => 6.00,
             // Not hard-enforced — InterServer's own Windows minimum is much lower than 8.
             // "recommended_min_slices" only drives the on-screen "starts from 8 slices" note.
-            'min_slices'   => 1,
+            'min_slices'   => 2,
             'recommended_min_slices' => 8,
         ],
     ],
