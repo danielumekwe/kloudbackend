@@ -19,8 +19,12 @@ return new class extends Migration
             $table->timestamp('overdue_notified_at')->nullable()->after('reminder_sent_at');
         });
 
+        $expr = DB::getDriverName() === 'sqlite'
+            ? "datetime(created_at, '+7 days')"
+            : 'DATE_ADD(created_at, INTERVAL 7 DAY)';
+
         DB::table('invoices')->whereNull('due_date')->update([
-            'due_date' => DB::raw("datetime(created_at, '+7 days')"),
+            'due_date' => DB::raw($expr),
         ]);
     }
 
