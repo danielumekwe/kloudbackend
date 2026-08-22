@@ -13,9 +13,14 @@ class AdminMessageMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public string $firstName,
-        public string $subject,
+        string $subject,
         public string $body,
-    ) {}
+    ) {
+        // Assigned to the inherited (untyped) Mailable::$subject rather than
+        // promoted, since promoting it here would redeclare that property
+        // with a type and fatal: "Type of ...::$subject must not be defined".
+        $this->subject = $subject;
+    }
 
     public function build(): self
     {
