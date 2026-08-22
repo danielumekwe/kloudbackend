@@ -14,9 +14,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('invoices', function (Blueprint $table) {
-            $table->timestamp('due_date')->nullable()->after('total');
-            $table->timestamp('reminder_sent_at')->nullable()->after('due_date');
-            $table->timestamp('overdue_notified_at')->nullable()->after('reminder_sent_at');
+            if (! Schema::hasColumn('invoices', 'due_date')) {
+                $table->timestamp('due_date')->nullable()->after('total');
+            }
+            if (! Schema::hasColumn('invoices', 'reminder_sent_at')) {
+                $table->timestamp('reminder_sent_at')->nullable()->after('due_date');
+            }
+            if (! Schema::hasColumn('invoices', 'overdue_notified_at')) {
+                $table->timestamp('overdue_notified_at')->nullable()->after('reminder_sent_at');
+            }
         });
 
         $expr = DB::getDriverName() === 'sqlite'
