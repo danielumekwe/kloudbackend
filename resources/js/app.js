@@ -60,6 +60,59 @@ window.generateStrongPassword = function (length = 16) {
 };
 
 // -----------------------------------------------------------------------
+// Alpine.js component: rich-text editor (email composers)
+// A contenteditable box + toolbar backed by document.execCommand, synced
+// into a hidden textarea so the surrounding form submits HTML unchanged.
+// -----------------------------------------------------------------------
+window.richTextEditor = function (initialHtml = '') {
+    return {
+        html: initialHtml,
+
+        init() {
+            this.$refs.editor.innerHTML = this.html;
+        },
+
+        sync() {
+            this.html = this.$refs.editor.innerHTML;
+        },
+
+        exec(command, value = null) {
+            this.$refs.editor.focus();
+            document.execCommand(command, false, value);
+            this.sync();
+        },
+
+        insertLink() {
+            const url = window.prompt('Link URL (https://...)');
+            if (!url) return;
+
+            this.$refs.editor.focus();
+
+            // execCommand('createLink') is a no-op without a text selection
+            // to wrap, so fall back to inserting the URL itself as the link text.
+            if (window.getSelection()?.isCollapsed) {
+                const span = document.createElement('span');
+                const link = document.createElement('a');
+                link.href = url;
+                link.textContent = url;
+                span.appendChild(link);
+                document.execCommand('insertHTML', false, span.innerHTML);
+            } else {
+                document.execCommand('createLink', false, url);
+            }
+
+            this.sync();
+        },
+
+        insertImage() {
+            const url = window.prompt('Image URL (https://...)');
+            if (!url) return;
+            this.exec('insertImage', url);
+        },
+    };
+};
+
+// -----------------------------------------------------------------------
 // Alpine.js component: main layout (sidebar + dark mode)
 // -----------------------------------------------------------------------
 window.appLayout = function () {

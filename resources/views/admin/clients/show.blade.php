@@ -139,9 +139,27 @@
                 <label class="form-label">Subject</label>
                 <input type="text" name="subject" class="form-input" required maxlength="200">
             </div>
-            <div>
+            <div x-data="richTextEditor()" x-init="init()">
                 <label class="form-label">Message</label>
-                <textarea name="body" class="form-input" rows="6" required maxlength="5000"></textarea>
+                <div class="rounded-xl border border-slate-300 dark:border-white/[0.1] overflow-hidden">
+                    <div class="flex items-center gap-1 px-2 py-1.5 border-b border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-white/[0.03]">
+                        <button type="button" @click="exec('bold')" class="rich-editor-toolbar-btn" title="Bold"><b>B</b></button>
+                        <button type="button" @click="exec('italic')" class="rich-editor-toolbar-btn" title="Italic"><i>I</i></button>
+                        <button type="button" @click="exec('underline')" class="rich-editor-toolbar-btn" title="Underline"><u>U</u></button>
+                        <span class="w-px h-4 bg-slate-200 dark:bg-white/[0.08] mx-1"></span>
+                        <button type="button" @click="exec('insertUnorderedList')" class="rich-editor-toolbar-btn" title="Bullet list">List</button>
+                        <button type="button" @click="exec('insertOrderedList')" class="rich-editor-toolbar-btn" title="Numbered list">1. List</button>
+                        <span class="w-px h-4 bg-slate-200 dark:bg-white/[0.08] mx-1"></span>
+                        <button type="button" @click="insertLink()" class="rich-editor-toolbar-btn" title="Insert link">Link</button>
+                        <button type="button" @click="insertImage()" class="rich-editor-toolbar-btn" title="Insert image">Image</button>
+                    </div>
+                    <div x-ref="editor"
+                         @input="sync()"
+                         contenteditable="true"
+                         data-placeholder="Write your message… use the toolbar to add links or images"
+                         class="rich-editor-body px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 min-h-[150px] max-h-[400px] overflow-y-auto focus:outline-none"></div>
+                </div>
+                <textarea name="body" x-text="html" class="hidden"></textarea>
             </div>
             <button type="submit" class="btn btn-primary text-sm">Send Email</button>
         </form>

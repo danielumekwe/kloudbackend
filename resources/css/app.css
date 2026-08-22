@@ -361,6 +361,37 @@ tbody tr:hover { background-color: theme(colors.slate.50); }
 .dark tbody tr:hover { background-color: rgba(255,255,255,0.02); }
 
 /* -----------------------------------------------------------------------
+   Rich-text editor (email composers)
+------------------------------------------------------------------------ */
+.rich-editor-toolbar-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 0.375rem;
+    color: theme(colors.slate.600);
+}
+.rich-editor-toolbar-btn:hover {
+    background-color: theme(colors.slate.200);
+}
+.dark .rich-editor-toolbar-btn {
+    color: theme(colors.slate.300);
+}
+.dark .rich-editor-toolbar-btn:hover {
+    background-color: rgba(255,255,255,0.08);
+}
+
+.rich-editor-body[contenteditable]:empty:before {
+    content: attr(data-placeholder);
+    color: theme(colors.slate.400);
+}
+.rich-editor-body ul, .rich-editor-body ol { padding-left: 1.25rem; }
+.rich-editor-body ul { list-style: disc; }
+.rich-editor-body ol { list-style: decimal; }
+.rich-editor-body a { color: theme(colors.blue.600); text-decoration: underline; }
+.dark .rich-editor-body a { color: theme(colors.blue.400); }
+.rich-editor-body img { max-width: 100%; border-radius: 0.5rem; }
+
+/* -----------------------------------------------------------------------
    Spinner
 ------------------------------------------------------------------------ */
 .spinner {

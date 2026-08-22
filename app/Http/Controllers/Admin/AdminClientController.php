@@ -14,6 +14,7 @@ use App\Models\SslOrder;
 use App\Models\VpsOrder;
 use App\Services\TicketService;
 use App\Support\CurrencyConverter;
+use App\Support\HtmlSanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -146,13 +147,13 @@ class AdminClientController extends Controller
     {
         $validated = $request->validate([
             'subject' => ['required', 'string', 'max:200'],
-            'body'    => ['required', 'string', 'max:5000'],
+            'body'    => ['required', 'string', 'max:20000'],
         ]);
 
         Mail::to($client->email)->send(new AdminMessageMail(
             firstName: $client->firstname,
             subject:   $validated['subject'],
-            body:      $validated['body'],
+            body:      HtmlSanitizer::clean($validated['body']),
         ));
 
         return redirect()->route('admin.clients.show', $client)
